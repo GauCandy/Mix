@@ -1,0 +1,19 @@
+{
+  "name": "discord-merge-bot",
+  "version": "1.0.0",
+  "description": "Bot Discord merge: auto role, rename channel, rules menu, report command, keep-alive server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "YourName",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}
