@@ -9,11 +9,11 @@ const {
 } = require("discord.js");
 require("dotenv").config();
 const express = require("express");
-
 const TOKEN = process.env.TOKEN;
 const REPORT_CHANNEL_ID = process.env.REPORT_CHANNEL_ID;
-
+const CATEGORY_ID = process.env.CATEGORY_ID; // Category ID từ .env
 const BASE_ROLE_ID = "1415319898468651008";
+const WELCOME_CHANNEL_ID = "1411590263033561128"; // Channel rules
 
 const BLOCK_ROLE_IDS = [
   "1411639327909220352","1411085492631506996","1418990676749848576","1410988790444458015",
@@ -37,6 +37,32 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
 
+// ===== Tin nhắn rules chính (mainEmbed) =====
+const mainEmbed = new EmbedBuilder()
+  .setTitle("📜 Welcome to the Sol's RNG Community rules channel!")
+  .setDescription(
+`**This is where all the rules enforced on our Discord server are listed. Please read and follow them to ensure a pleasant experience for everyone!**
+
+If there is anything confusing, you can go to the channel <#1411590263033561128> to contact the server administrators and ask questions.
+
+⚠️ Warning Point & Punishment System:
+\`\`\`
+ • 1 Warning Point  = no punishment  
+ • 2 Warning Points = 1h Mute 
+ • 3 Warning Points = 12h Mute 
+ • 4 Warning Points = 1d Mute 
+ • 5 Warning Points = A ban 
+ • Warning Points expire after 30 days
+\`\`\`
+
+-# Thank you for reading and following! We always strive to develop the most civilized and prosperous Sol's RNG community in Southeast Asia!`
+  )
+  .setColor(0x2f3136)
+  .setImage("https://media.discordapp.net/attachments/1411987904980586576/1412916875163209901/SOLS_RNG_COUMUNICATION.png")
+  .setFooter({ text: "Sol's RNG Community" })
+  .setTimestamp();
+
+// ===== Hàm đổi nickname & role =====
 function cleanNickname(name) {
   return name.replace(/[^\p{L}\p{N}_]/gu, "").trim();
 }
@@ -71,12 +97,39 @@ async function updateMemberRolesAndNick(member) {
   }
 }
 
-client.once("ready", () => {
+// ===== Hàm đổi tên channel webhook =====
+async function renameChannel(channel) {
+  if (channel.parentId !== CATEGORY_ID) return;
+  if (!channel.name.endsWith("-webhook")) return;
+
+  const username = channel.name.replace("-webhook", "");
+  const newName = `🛠★】${username}-macro`;
+
+  if (channel.name !== newName) {
+    try {
+      await channel.setName(newName);
+      console.log(`✅ Đã đổi tên: ${channel.name} → ${newName}`);
+    } catch (err) {
+      console.error(`❌ Lỗi đổi tên ${channel.id}:`, err);
+    }
+  }
+}
+
+// ===== Sự kiện bot =====
+client.once("ready", async () => {
   console.log(`✅ Bot đã đăng nhập dưới tên ${client.user.tag}`);
+
+  // Gửi mainEmbed lần đầu khi bot khởi động
+  const rulesChannel = client.channels.cache.get(WELCOME_CHANNEL_ID);
+  if (rulesChannel) {
+    await rulesChannel.send({ embeds: [mainEmbed] }).catch(() => {});
+  }
 });
 
 client.on("guildMemberAdd", updateMemberRolesAndNick);
 client.on("guildMemberUpdate", (_, newMember) => updateMemberRolesAndNick(newMember));
+client.on("channelCreate", (channel) => renameChannel(channel));
+client.on("channelUpdate", (_, channel) => renameChannel(channel));
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
