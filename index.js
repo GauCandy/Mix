@@ -8,6 +8,7 @@ const {
   Partials,
 } = require("discord.js");
 require("dotenv").config();
+const express = require("express");
 
 // ===== CONFIG =====
 const TOKEN = process.env.TOKEN;
@@ -70,7 +71,7 @@ async function sendRulesMenu() {
   const mainEmbed = new EmbedBuilder()
     .setTitle("📜 Welcome to the Sol's RNG Community rules channel!")
     .setDescription(
-      `**This is where all the rules enforced on our Discord server are listed. Please read and follow them to ensure a pleasant experience for everyone!**
+     `**This is where all the rules enforced on our Discord server are listed. Please read and follow them to ensure a pleasant experience for everyone!**
 
 If there is anything confusing, you can go to the channel <#1411590263033561128> to contact the server administrators and ask questions.
 
@@ -84,7 +85,7 @@ If there is anything confusing, you can go to the channel <#1411590263033561128>
  • Warning Points expire after 30 days
 \`\`\`
 
--# Thank you for reading and following! We always strive to develop the most civilized and prosperous Sol's RNG community in Southeast Asia!`
+Thank you for reading and following! We always strive to develop the most civilized and prosperous Sol's RNG community in Southeast Asia!`
     )
     .setColor(0x2f3136)
     .setFooter({ text: "Sol's RNG Community" })
@@ -94,11 +95,11 @@ If there is anything confusing, you can go to the channel <#1411590263033561128>
     .setCustomId("rules_menu")
     .setPlaceholder("Select rules you want to see")
     .addOptions([
-      { label: "1 Warning Rules", value: "opt1", description: "1 warn violations" },
-      { label: "Channel Misuses", value: "opt2", description: "Channel misuse violations" },
-      { label: "2 Warning Rules", value: "opt3", description: "2 warn violations" },
-      { label: "3 Warning Rules", value: "opt4", description: "3 warn violations" },
-      { label: "Instant Ban Rules", value: "opt5", description: "Instant ban violations" },
+       { label: "1 Warning Rules", value: "opt1", description: "Rule violations that will get you 1 warn." },
+      { label: "Channel Misuses", value: "opt2", description: "Channel Misuse rules that will get you 1 warn." },
+      { label: "2 Warning Rules", value: "opt3", description: "Rule violations that will get you 2 warns." },
+      { label: "3 Warning Rules", value: "opt4", description: "Rule violations that will get you 3 warns." },
+      { label: "Instant Ban Rules", value: "opt5", description: "Rule violations that will get you a ban." },
     ]);
 
   const row = new ActionRowBuilder().addComponents(menu);
@@ -183,6 +184,11 @@ client.on("interactionCreate", async (interaction) => {
   const value = interaction.values[0];
   await interaction.reply({ content: `Bạn chọn: ${value}`, ephemeral: true });
 });
+
+// ===== Keep-alive =====
+const app = express();
+app.get("/", (req, res) => res.send("Bot vẫn online! ✅"));
+app.listen(process.env.PORT || 3000, () => console.log("🌐 Keep-alive server chạy"));
 
 // ===== LOGIN =====
 client.login(TOKEN);
