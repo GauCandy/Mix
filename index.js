@@ -4,6 +4,8 @@ const {
   GatewayIntentBits,
   Partials,
   Collection,
+  REST,
+  Routes,
 } = require("discord.js");
 require("dotenv").config();
 const express = require("express");
@@ -22,6 +24,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+const commandsArray = [];
 
 // ==== Load commands từ thư mục /commands ====
 const commandsPath = path.join(__dirname, "commands");
@@ -31,10 +34,30 @@ const commandFiles = fs
 
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
-  client.commands.set(command.name, command);
+  if ("data" in command && "execute" in command) {
+    client.commands.set(command.data.name, command);
+    commandsArray.push(command.data.toJSON());
+  } else {
+    console.warn(`⚠️ Command ${file} thiếu "data" hoặc "execute"`);
+  }
 }
 
-// ==== Khi có interaction ====
+// ==== Load events từ thư mục /events ====
+const eventsPath = path.join(__dirname, "events");
+const eventFiles = fs
+  .readdirSync(eventsPath)
+  .filter((file) => file.endsWith(".js"));
+
+for (const file of eventFiles) {
+  const event = require(`./events/${file}`);
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args, client));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args, client));
+  }
+}
+
+// ==== Khi bot có interaction (slash command) ====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -53,8 +76,22 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 // ==== Khi bot online ====
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+
+  // Deploy slash commands khi bot khởi động
+  const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+
+  try {
+    console.log("🔄 Đang đăng ký slash commands...");
+    await rest.put(
+      Routes.applicationCommands(client.user.id),
+      { body: commandsArray }
+    );
+    console.log("✅ Slash commands đã được đăng ký thành công!");
+  } catch (error) {
+    console.error("❌ Lỗi khi deploy commands:", error);
+  }
 });
 
 // ==== Keep Alive (cho hosting free như Railway/Heroku/Replit) ====
