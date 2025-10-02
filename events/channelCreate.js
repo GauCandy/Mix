@@ -1,7 +1,8 @@
 module.exports = (client, CATEGORY_ID, ROLE_ID, renameChannel) => {
   client.on("channelCreate", async (channel) => {
     if (channel.parentId !== CATEGORY_ID) return;
-    await renameChannel(channel, CATEGORY_ID);
+
+    await renameChannel(channel);
 
     if (!channel.topic) return;
     const match = channel.topic.match(/(\d{17,19})$/);
