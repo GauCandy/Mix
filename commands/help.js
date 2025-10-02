@@ -1,14 +1,9 @@
-const { SlashCommandBuilder } = require("discord.js");
-
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("help")
-    .setDescription("Xem danh sách lệnh của bot"),
-
+  name: "help",
   async execute(interaction) {
     await interaction.reply({
-      content: "ℹ️ Các lệnh hiện có:\n`/help` - Xem danh sách lệnh\n`/report` - Báo cáo vi phạm",
-      ephemeral: true,
+      content: "ℹ️ Lệnh này tạm thời chưa dùng được, vui lòng chờ cập nhật sau.",
+      ephemeral: true
     });
-  },
+  }
 };
