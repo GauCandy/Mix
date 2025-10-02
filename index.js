@@ -1,16 +1,16 @@
+// ====== Discord Bot ======
 const {
   Client,
   GatewayIntentBits,
   Partials,
   Collection,
-  REST,
-  Routes,
 } = require("discord.js");
 require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
 
+// ==== Khởi tạo client ====
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,54 +22,66 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-const commandsArray = [];
 
-// ==== Load commands ====
+// ==== Load commands từ thư mục /commands ====
 const commandsPath = path.join(__dirname, "commands");
-if (fs.existsSync(commandsPath)) {
-  const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
-  for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    if ("data" in command && "execute" in command) {
-      client.commands.set(command.data.name, command);
-      commandsArray.push(command.data.toJSON());
-    } else {
-      console.warn(`⚠️ Command ${file} thiếu "data" hoặc "execute"`);
-    }
+const commandFiles = fs.readdirSync(commandsPath).filter((f) => f.endsWith(".js"));
+
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+  if ("data" in command && "execute" in command) {
+    client.commands.set(command.data.name, command);
   }
 }
 
-// ==== Load events ====
+// ==== Load events từ thư mục /events ====
 const eventsPath = path.join(__dirname, "events");
-if (fs.existsSync(eventsPath)) {
-  const eventFiles = fs.readdirSync(eventsPath).filter(f => f.endsWith(".js"));
-  for (const file of eventFiles) {
-    const event = require(`./events/${file}`);
-    if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args, client));
-    } else {
-      client.on(event.name, (...args) => event.execute(...args, client));
-    }
+const eventFiles = fs.readdirSync(eventsPath).filter((f) => f.endsWith(".js"));
+
+const { renameChannel } = require("./functions/rename");
+const { updateMemberRoles } = require("./functions/updateRoles");
+const rules = require("./rules");
+
+for (const file of eventFiles) {
+  const event = require(`./events/${file}`);
+
+  // tuỳ theo event export function gì thì truyền tham số
+  if (file === "channelCreate.js") {
+    event(client, process.env.CATEGORY_ID, process.env.ROLE_ID, renameChannel);
+  } else if (file === "guildMemberAdd.js") {
+    event(client, updateMemberRoles);
+  } else if (file === "interaction.js") {
+    event(client, rules);
+  } else if (file === "messageDeleteBot.js") {
+    event(client);
+  } else if (file === "ready.js") {
+    const { StringSelectMenuBuilder, ActionRowBuilder } = require("discord.js");
+    event(client, process.env.CATEGORY_ID, process.env.RULES_CHANNEL_ID, renameChannel);
   }
 }
 
-// ==== Ready ====
-client.once("ready", async () => {
-  console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+// ==== Khi có interaction command ====
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
-  const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
   try {
-    console.log("🔄 Đang đăng ký slash commands...");
-    await rest.put(Routes.applicationCommands(client.user.id), { body: commandsArray });
-    console.log("✅ Slash commands đã được đăng ký!");
+    await command.execute(interaction, client);
   } catch (error) {
-    console.error("❌ Lỗi khi deploy commands:", error);
+    console.error(error);
+    await interaction.reply({
+      content: "❌ Đã xảy ra lỗi khi chạy lệnh này.",
+      ephemeral: true,
+    });
   }
 });
 
-// ==== Keep alive ====
+// ==== Keep Alive ====
 const app = express();
-app.get("/", (req, res) => res.send("Bot vẫn online ✅"));
+app.get("/", (req, res) => res.send("Bot vẫn online! ✅"));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Keep-alive server chạy"));
 
+// ==== Login ====
 client.login(process.env.TOKEN);
