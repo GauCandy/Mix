@@ -1,4 +1,4 @@
-const { updateMemberRoles } = require("./updateRoles");
+const { updateMemberRoles } = require("./functions/updateRoles");
 
 module.exports = (client) => {
   client.on("guildMemberAdd", updateMemberRoles);
