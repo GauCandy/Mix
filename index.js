@@ -5,7 +5,6 @@ const express = require("express");
 // ==== Functions ====
 const { renameChannel } = require("./functions/rename");
 const { updateMemberRoles } = require("./functions/updateRoles");
-const { sendMainMessage } = require("./functions/sendRules");
 const rules = require("./rules");
 
 // ==== Events ====
@@ -33,7 +32,8 @@ const client = new Client({
 });
 
 // ==== Register Events ====
-readyEvent(client, CATEGORY_ID, RULES_CHANNEL_ID, sendMainMessage, renameChannel);
+// chỉ cần truyền renameChannel thôi, không cần sendMainMessage nữa
+readyEvent(client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel);
 guildMemberEvent(client, updateMemberRoles);
 channelCreateEvent(client, CATEGORY_ID, ROLE_ID, renameChannel);
 interactionEvent(client, rules);
