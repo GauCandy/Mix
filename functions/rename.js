@@ -1,19 +1,19 @@
-async function renameChannel(channel) {
+// Đổi tên channel khi tạo trong CATEGORY_ID
+async function renameChannel(channel, CATEGORY_ID) {
   try {
-    if (!channel.isTextBased()) return;
-    if (!channel.topic) return;
+    if (channel.parentId !== CATEGORY_ID) return;
+    if (!channel.name.endsWith("-webhook")) return;
 
-    const match = channel.topic.match(/(\d{17,19})$/);
-    if (!match) return;
+    const username = channel.name.replace("-webhook", "");
+    const newName = `🛠★】${username}-macro`;
 
-    const userId = match[1];
-    const member = await channel.guild.members.fetch(userId);
-    if (member) {
-      await channel.setName(member.user.username).catch(() => {});
-      console.log(`✏️ Đã đổi tên kênh thành ${member.user.username}`);
+    if (channel.name !== newName) {
+      await channel.setName(newName);
+      console.log(`✅ Đổi tên kênh: ${channel.name} → ${newName}`);
     }
   } catch (err) {
     console.error("❌ Lỗi renameChannel:", err);
   }
 }
+
 module.exports = { renameChannel };
