@@ -13,7 +13,7 @@ const BLOCK_ROLE_IDS = [
 
 async function updateMemberRoles(member) {
   try {
-    if (member.user.bot) return;
+    if (!member || member.user.bot) return;
 
     const hasBaseRole = member.roles.cache.has(BASE_ROLE_ID);
     const hasAnyBlockRole = member.roles.cache.some(r => BLOCK_ROLE_IDS.includes(r.id));
