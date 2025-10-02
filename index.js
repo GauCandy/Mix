@@ -23,67 +23,48 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// ==== Load commands từ thư mục /commands ====
+// ==== Load commands ====
 const commandsPath = path.join(__dirname, "commands");
-const commandFiles = fs.readdirSync(commandsPath).filter((f) => f.endsWith(".js"));
+const commandFiles = fs
+  .readdirSync(commandsPath)
+  .filter((file) => file.endsWith(".js"));
 
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
-  if ("data" in command && "execute" in command) {
+  if (command.data && command.data.name) {
     client.commands.set(command.data.name, command);
+  } else {
+    console.warn(`⚠️ Command ${file} thiếu "data.name"`);
   }
 }
 
-// ==== Load events từ thư mục /events ====
+// ==== Load events ====
 const eventsPath = path.join(__dirname, "events");
-const eventFiles = fs.readdirSync(eventsPath).filter((f) => f.endsWith(".js"));
-
-const { renameChannel } = require("./functions/rename");
-const { updateMemberRoles } = require("./functions/updateRoles");
-const rules = require("./rules");
+const eventFiles = fs
+  .readdirSync(eventsPath)
+  .filter((file) => file.endsWith(".js"));
 
 for (const file of eventFiles) {
   const event = require(`./events/${file}`);
-
-  // tuỳ theo event export function gì thì truyền tham số
-  if (file === "channelCreate.js") {
-    event(client, process.env.CATEGORY_ID, process.env.ROLE_ID, renameChannel);
-  } else if (file === "guildMemberAdd.js") {
-    event(client, updateMemberRoles);
-  } else if (file === "interaction.js") {
-    event(client, rules);
-  } else if (file === "messageDeleteBot.js") {
+  if (typeof event === "function") {
     event(client);
-  } else if (file === "ready.js") {
-    const { StringSelectMenuBuilder, ActionRowBuilder } = require("discord.js");
-    event(client, process.env.CATEGORY_ID, process.env.RULES_CHANNEL_ID, renameChannel);
+    console.log(`✅ Loaded event: ${file}`);
+  } else {
+    console.warn(`⚠️ Event ${file} không export function`);
   }
 }
 
-// ==== Khi có interaction command ====
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
-  try {
-    await command.execute(interaction, client);
-  } catch (error) {
-    console.error(error);
-    await interaction.reply({
-      content: "❌ Đã xảy ra lỗi khi chạy lệnh này.",
-      ephemeral: true,
-    });
-  }
+// ==== Khi bot online ====
+client.once("ready", () => {
+  console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
 });
-// ==== Load events roles ====
-require("./events/guildMemberAdd")(client);
 
-// ==== Keep Alive ====
+// ==== Keep Alive (cho hosting free) ====
 const app = express();
 app.get("/", (req, res) => res.send("Bot vẫn online! ✅"));
-app.listen(process.env.PORT || 3000, () => console.log("🌐 Keep-alive server chạy"));
+app.listen(process.env.PORT || 3000, () =>
+  console.log("🌐 Keep-alive server chạy")
+);
 
 // ==== Login ====
 client.login(process.env.TOKEN);
