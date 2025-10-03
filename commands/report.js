@@ -1,31 +1,40 @@
 const { SlashCommandBuilder } = require("discord.js");
+const { createReportEmbed } = require("../functions/report");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("report")
-    .setDescription("Báo cáo một người dùng vi phạm")
-    .addUserOption((option) =>
-      option.setName("user").setDescription("Người bị báo cáo").setRequired(true)
+    .setDescription("Report một người dùng")
+    .addUserOption(opt =>
+      opt.setName("user").setDescription("Người bị report").setRequired(true)
     )
-    .addStringOption((option) =>
-      option.setName("reason").setDescription("Lý do").setRequired(true)
+    .addStringOption(opt =>
+      opt.setName("reason").setDescription("Lý do report").setRequired(true)
+    )
+    .addStringOption(opt =>
+      opt.setName("proof").setDescription("Link ảnh / bằng chứng").setRequired(false)
     ),
-
   async execute(interaction) {
-    const user = interaction.options.getUser("user");
+    const reported = interaction.options.getUser("user");
     const reason = interaction.options.getString("reason");
+    const proof = interaction.options.getString("proof");
+    const channel = `<#${interaction.channel.id}>`;
 
-    const reportChannelId = process.env.REPORT_CHANNEL_ID;
-    const reportChannel = interaction.guild.channels.cache.get(reportChannelId);
+    const embed = createReportEmbed({
+      reporter: interaction.user.tag,
+      reported: reported.tag,
+      reason,
+      proof,
+      channel,
+    });
 
+    const reportChannel = interaction.guild.channels.cache.get(process.env.REPORT_CHANNEL_ID);
     if (reportChannel) {
-      await reportChannel.send(
-        `🚨 **Báo cáo vi phạm**\n👤 Người bị báo cáo: ${user}\n📄 Lý do: ${reason}\n📢 Người báo cáo: ${interaction.user}`
-      );
+      await reportChannel.send({ embeds: [embed] });
     }
 
     await interaction.reply({
-      content: `✅ Đã gửi báo cáo về ${user} với lý do: ${reason}`,
+      content: "✅ Report của bạn đã được gửi tới team mod!",
       ephemeral: true,
     });
   },
