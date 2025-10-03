@@ -5,12 +5,21 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
   client.once("ready", async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
 
-    // ===== Set presence 1 lần khi bot online =====
+    // ===== Đếm số thành viên trong server chính =====
+    const guild = client.guilds.cache.first(); // server đầu tiên bot tham gia
+    if (!guild) {
+      console.log("❌ Bot không ở trong server nào!");
+      return;
+    }
+
+    const memberCount = guild.memberCount;
+
+    // Set status: hiển thị số thành viên
     client.user.setPresence({
       activities: [
         {
-          name: "Sol's RNG", // bạn đổi text tuỳ ý
-          type: 0 // 0 = Playing, 3 = Watching, 5 = Competing
+          name: `👥 ${memberCount} members`,
+          type: 3 // 3 = Watching, sẽ hiện "Watching 👥 123 members"
         }
       ],
       status: "online"
