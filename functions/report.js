@@ -1,4 +1,3 @@
-// functions/report.js
 const { EmbedBuilder } = require("discord.js");
 
 function createReportEmbed({ reporter, reported, reason, proof, channel }) {
@@ -11,20 +10,20 @@ function createReportEmbed({ reporter, reported, reason, proof, channel }) {
       Vui lòng kiểm tra chi tiết bên dưới:`
     )
     .addFields(
-      { name: "👤 Reporter", value: reporter || "Unknown", inline: true },
-      { name: "⚠️ Reported User", value: reported || "Unknown", inline: true },
-      { name: "📄 Reason", value: reason || "Không có lý do", inline: false }
+      { name: "👤 Reporter", value: reporter, inline: true },
+      { name: "⚠️ Reported User", value: reported, inline: true },
+      { name: "📝 Reason", value: reason || "Không có", inline: false },
+      { name: "📍 Channel", value: channel || "Không xác định", inline: false }
     )
     .setFooter({ text: "Moderation System | Auto-Report" })
     .setTimestamp();
 
-  if (channel) {
-    embed.addFields({ name: "📍 Channel", value: channel, inline: true });
-  }
-
+  // ✅ Proof là tùy chọn
   if (proof) {
-    embed.addFields({ name: "🖼 Proof / Evidence", value: `[Click Here](${proof})` });
-    embed.setImage(proof);
+    embed.addFields({ name: "📎 Proof", value: proof, inline: false });
+    if (proof.startsWith("http")) {
+      embed.setImage(proof);
+    }
   }
 
   return embed;
