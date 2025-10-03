@@ -5,6 +5,17 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
   client.once("ready", async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
 
+    // ===== Set presence 1 lần khi bot online =====
+    client.user.setPresence({
+      activities: [
+        {
+          name: "Keep gambling to get global aura...", // bạn đổi text tuỳ ý
+          type: 0 // 0 = Playing, 3 = Watching, 5 = Competing
+        }
+      ],
+      status: "online"
+    });
+
     // ===== Rename tất cả channel trong Category =====
     client.channels.cache
       .filter(ch => ch.parentId === CATEGORY_ID)
@@ -15,7 +26,6 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
       const channel = await client.channels.fetch(RULES_CHANNEL_ID);
       if (!channel) return console.log("❌ Không tìm thấy kênh rules");
 
-      // ID tin nhắn embed chính đã ghim sẵn
       const MAIN_MESSAGE_ID = "1423173479825543189";
       const mainMessage = await channel.messages.fetch(MAIN_MESSAGE_ID);
 
@@ -23,7 +33,6 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
         return console.log("❌ Không tìm thấy embed chính trong channel!");
       }
 
-      // Kiểm tra đã có menu chưa
       const hasMenu =
         mainMessage.components.length > 0 &&
         mainMessage.components[0].components[0].customId === "rules_menu";
@@ -71,7 +80,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
 
         await mainMessage.edit({
           content: "📜 **Server Rules are pinned here:**",
-          embeds: mainMessage.embeds, // giữ nguyên embed cũ
+          embeds: mainMessage.embeds,
           components: [row],
         });
 
