@@ -2,12 +2,14 @@ const { renameChannel } = require("../functions/rename");
 
 const CATEGORY_ID = process.env.CATEGORY_ID;   // ID category chứa channel
 const ROLE_ID = process.env.AUTO_ROLE_ID;      // Role auto add khi tạo channel
+const TARGET_ROLES = ["1410990099042271352", "1411991634194989096"]; // 2 role bật/tắt ViewChannel
 
 // Map lưu timer cho từng channel
 const channelTimers = new Map();
 
 module.exports = (client) => {
-  // ====== Khi channel mới được tạo ======
+
+  // ===== Khi channel mới được tạo =====
   client.on("channelCreate", async (channel) => {
     try {
       if (channel.parentId !== CATEGORY_ID) return;
@@ -29,7 +31,7 @@ module.exports = (client) => {
     }
   });
 
-  // ====== Khi có tin nhắn mới trong channel ======
+  // ===== Khi có tin nhắn mới trong channel =====
   client.on("messageCreate", async (message) => {
     try {
       const channel = message.channel;
@@ -45,25 +47,29 @@ module.exports = (client) => {
 
       const isWebhookMsg = !!message.webhookId;
 
-      // Check xem channel hiện đang ẩn hay mở
-      const isHidden = channel.permissionOverwrites.cache.some(
-        ow => ow.deny.has("ViewChannel") && ow.id === channel.guild.roles.everyone.id
-      );
+      // Kiểm tra xem có role target nào bị ẩn không
+      const isHidden = TARGET_ROLES.some(roleId => {
+        const ow = channel.permissionOverwrites.cache.get(roleId);
+        return ow?.deny.has("ViewChannel");
+      });
 
-      // Nếu là webhook → luôn mở lại và reset 3 ngày
+      // ===== Nếu là webhook → mở lại và đặt hẹn 3 ngày =====
       if (isWebhookMsg) {
-        for (const role of channel.guild.roles.cache.values()) {
-          if (role.managed || role.id === channel.guild.roles.everyone.id) continue;
-          await channel.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
+        for (const roleId of TARGET_ROLES) {
+          const role = channel.guild.roles.cache.get(roleId);
+          if (role) {
+            await channel.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
+          }
         }
 
-        // Reset timer 3 ngày
         if (channelTimers.has(channel.id)) clearTimeout(channelTimers.get(channel.id));
         const timer = setTimeout(async () => {
           try {
-            for (const role of channel.guild.roles.cache.values()) {
-              if (role.managed || role.id === channel.guild.roles.everyone.id) continue;
-              await channel.permissionOverwrites.edit(role, { ViewChannel: false }).catch(() => {});
+            for (const roleId of TARGET_ROLES) {
+              const role = channel.guild.roles.cache.get(roleId);
+              if (role) {
+                await channel.permissionOverwrites.edit(role, { ViewChannel: false }).catch(() => {});
+              }
             }
             if (member.roles.cache.has(ROLE_ID)) {
               await member.roles.remove(ROLE_ID).catch(() => {});
@@ -75,22 +81,26 @@ module.exports = (client) => {
         }, 3 * 24 * 60 * 60 * 1000);
 
         channelTimers.set(channel.id, timer);
-        console.log(`✅ Channel ${channel.name} mở lại do có webhook mới (everyone vẫn bị ẩn)`);
+        console.log(`✅ Channel ${channel.name} mở lại do có webhook mới`);
       }
 
-      // Nếu là user → chỉ xử lý khi channel đang ẩn
+      // ===== Nếu là user → chỉ mở khi đang ẩn và đặt hẹn 8h =====
       else if (!isWebhookMsg && isHidden) {
-        for (const role of channel.guild.roles.cache.values()) {
-          if (role.managed || role.id === channel.guild.roles.everyone.id) continue;
-          await channel.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
+        for (const roleId of TARGET_ROLES) {
+          const role = channel.guild.roles.cache.get(roleId);
+          if (role) {
+            await channel.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
+          }
         }
 
         if (channelTimers.has(channel.id)) clearTimeout(channelTimers.get(channel.id));
         const timer = setTimeout(async () => {
           try {
-            for (const role of channel.guild.roles.cache.values()) {
-              if (role.managed || role.id === channel.guild.roles.everyone.id) continue;
-              await channel.permissionOverwrites.edit(role, { ViewChannel: false }).catch(() => {});
+            for (const roleId of TARGET_ROLES) {
+              const role = channel.guild.roles.cache.get(roleId);
+              if (role) {
+                await channel.permissionOverwrites.edit(role, { ViewChannel: false }).catch(() => {});
+              }
             }
             if (member.roles.cache.has(ROLE_ID)) {
               await member.roles.remove(ROLE_ID).catch(() => {});
@@ -102,7 +112,7 @@ module.exports = (client) => {
         }, 8 * 60 * 60 * 1000);
 
         channelTimers.set(channel.id, timer);
-        console.log(`✅ Channel ${channel.name} mở lại do user nhắn (everyone vẫn bị ẩn)`);
+        console.log(`✅ Channel ${channel.name} mở lại do user nhắn`);
       }
 
     } catch (err) {
@@ -110,7 +120,7 @@ module.exports = (client) => {
     }
   });
 
-  // ====== Khi channel bị xóa ======
+  // ===== Khi channel bị xóa =====
   client.on("channelDelete", async (channel) => {
     try {
       if (channel.parentId !== CATEGORY_ID) return;
@@ -126,6 +136,11 @@ module.exports = (client) => {
       if (member.roles.cache.has(ROLE_ID)) {
         await member.roles.remove(ROLE_ID).catch(() => {});
         console.log(`🗑️ Channel ${channel.name} bị xóa → đã gỡ role ${ROLE_ID} khỏi ${member.user.tag}`);
+      }
+
+      if (channelTimers.has(channel.id)) {
+        clearTimeout(channelTimers.get(channel.id));
+        channelTimers.delete(channel.id);
       }
     } catch (err) {
       console.error("❌ Lỗi channelDelete:", err);
