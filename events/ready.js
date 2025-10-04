@@ -39,7 +39,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
       const channel = await client.channels.fetch(RULES_CHANNEL_ID);
       if (!channel) return console.log("❌ Không tìm thấy kênh rules");
 
-      const MAIN_MESSAGE_ID = "1424079560546455642";
+      const MAIN_MESSAGE_ID = "1424089527751807101";
       const mainMessage = await channel.messages.fetch(MAIN_MESSAGE_ID);
 
       if (!mainMessage) {
