@@ -11,8 +11,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    await guild.members.fetch();
-
+    // ⚠️ Không fetch lại toàn bộ mỗi lần (Discord đã tự cache presence)
     const totalMembers = guild.members.cache.filter(m => 
       !m.user.bot && !m.roles.cache.has("1411639327909220352")
     ).size;
@@ -38,6 +37,10 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
   // =============================
   client.once("ready", async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+
+    // ⚡ Chỉ fetch 1 lần toàn bộ khi restart để có đầy đủ dữ liệu
+    const guild = client.guilds.cache.first();
+    if (guild) await guild.members.fetch({ withPresences: true });
     await updatePresence();
 
     // ===== Quét toàn bộ channel trong category 1 lần khi restart =====
