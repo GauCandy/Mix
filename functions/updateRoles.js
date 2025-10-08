@@ -1,8 +1,7 @@
 const BASE_ROLE_ID = "1415319898468651008";
 const AUTO_ROLE_ID = "1411240101832298569";
 const REMOVE_IF_HAS_ROLE_ID = "1410990099042271352";
-const SUPER_BLOCK_ROLE = "1411991634194989096"; // Không được giữ bất kỳ role nào khác
-const BASE_BLOCK_ROLE = "1411240101832298569"; // Khi có role này → không có base role
+const SOLO_ROLE_ID = "1411991634194989096"; // 👈 chỉ được có mỗi role này nếu có
 
 const BLOCK_ROLE_IDS = [
   "1411639327909220352","1411085492631506996","1418990676749848576","1410988790444458015",
@@ -13,102 +12,70 @@ const BLOCK_ROLE_IDS = [
   "1415320854014984342","1414165862205751326"
 ];
 
-/**
- * 🧠 Xử lý cập nhật roles cho member cụ thể
- */
 async function updateMemberRoles(member) {
   try {
-    if (!member || member.user.bot || !member.manageable) return;
+    if (member.user.bot) return;
 
     const roles = member.roles.cache;
-    const hasBase = roles.has(BASE_ROLE_ID);
-    const hasAuto = roles.has(AUTO_ROLE_ID);
-    const hasRemove = roles.has(REMOVE_IF_HAS_ROLE_ID);
-    const hasBlock = roles.some(r => BLOCK_ROLE_IDS.includes(r.id));
-    const hasBaseBlock = roles.has(BASE_BLOCK_ROLE);
-    const hasSuperBlock = roles.has(SUPER_BLOCK_ROLE);
+    const has = id => roles.has(id);
+    const remove = id => member.roles.remove(id).catch(() => {});
+    const add = id => member.roles.add(id).catch(() => {});
 
-    // 🔒 SUPER BLOCK → chỉ giữ lại chính nó
-    if (hasSuperBlock) {
-      const rolesToRemove = roles.filter(r => r.id !== SUPER_BLOCK_ROLE);
-      if (rolesToRemove.size > 0) {
-        for (const role of rolesToRemove.values()) {
-          await member.roles.remove(role).catch(() => {});
-        }
-        console.log(`🚫 ${member.user.tag}: super-block → cleared all other roles.`);
+    // Nếu có SOLO_ROLE_ID => chỉ giữ lại role đó
+    if (has(SOLO_ROLE_ID)) {
+      for (const role of roles.keys()) {
+        if (role !== SOLO_ROLE_ID) await remove(role);
       }
+      console.log(`🚫 ${member.user.tag} chỉ giữ lại role SOLO`);
       return;
     }
 
-    // 🚫 Có BASE_BLOCK_ROLE thì không thể có BASE
-    if (hasBaseBlock && hasBase) {
-      await member.roles.remove(BASE_ROLE_ID).catch(() => {});
-      console.log(`❌ Removed base role from ${member.user.tag} (has base-block role)`);
+    const hasBase = has(BASE_ROLE_ID);
+    const hasAuto = has(AUTO_ROLE_ID);
+    const hasRemove = has(REMOVE_IF_HAS_ROLE_ID);
+    const hasBlock = [...roles.keys()].some(r => BLOCK_ROLE_IDS.includes(r));
+
+    // Nếu có AUTO_ROLE_ID => không add base
+    if (has(AUTO_ROLE_ID)) return;
+
+    // Base role logic
+    if (!hasBase && !hasBlock && !hasAuto && !has(SOLO_ROLE_ID)) {
+      await add(BASE_ROLE_ID);
+      console.log(`✅ Thêm base cho ${member.user.tag}`);
+    } else if (hasBase && (hasBlock || hasRemove)) {
+      await remove(BASE_ROLE_ID);
+      console.log(`❌ Gỡ base khỏi ${member.user.tag}`);
     }
 
-    // ✅ Thêm BASE nếu đủ điều kiện
-    if (!hasBase && !hasBlock && !hasBaseBlock) {
-      await member.roles.add(BASE_ROLE_ID).catch(() => {});
-      console.log(`✅ Added base role for ${member.user.tag}`);
-    } else if (hasBase && hasBlock) {
-      await member.roles.remove(BASE_ROLE_ID).catch(() => {});
-      console.log(`❌ Removed base role from ${member.user.tag} (has block role)`);
+    // Auto role logic
+    if (!hasAuto && !hasRemove && !has(SOLO_ROLE_ID)) {
+      await add(AUTO_ROLE_ID);
+      console.log(`✅ Thêm auto cho ${member.user.tag}`);
+    } else if (hasAuto && hasRemove) {
+      await remove(AUTO_ROLE_ID);
+      console.log(`❌ Gỡ auto khỏi ${member.user.tag}`);
     }
 
-    // ✅ AUTO ROLE logic
-    if (!hasAuto && !hasRemove && !hasSuperBlock) {
-      await member.roles.add(AUTO_ROLE_ID).catch(() => {});
-      console.log(`✅ Added auto role for ${member.user.tag}`);
-    } else if (hasAuto && (hasRemove || hasSuperBlock)) {
-      await member.roles.remove(AUTO_ROLE_ID).catch(() => {});
-      console.log(`❌ Removed auto role from ${member.user.tag}`);
-    }
-
-    // 🧹 Nếu có BASE_BLOCK_ROLE → gỡ tất cả block roles
-    if (hasBaseBlock) {
-      for (const id of BLOCK_ROLE_IDS) {
-        if (roles.has(id)) {
-          await member.roles.remove(id).catch(() => {});
-          console.log(`🚫 Removed blocked role (${id}) from ${member.user.tag} (base-block active)`);
-        }
+    // Nếu có AUTO_ROLE thì xoá toàn bộ block role
+    if (has(AUTO_ROLE_ID)) {
+      for (const role of roles.keys()) {
+        if (BLOCK_ROLE_IDS.includes(role)) await remove(role);
       }
     }
 
   } catch (err) {
-    console.error(`❌ updateMemberRoles error (${member?.user?.tag}):`, err);
+    console.error("❌ updateMemberRoles error:", err);
   }
 }
 
-/**
- * ⚙️ Khởi tạo auto role system
- */
-function initRoleUpdater(client) {
-  client.once("ready", async () => {
-    const guild = client.guilds.cache.first();
-    if (!guild) return console.log("⚠️ Không tìm thấy guild.");
-
-    console.log(`🔍 Đang quét roles trong guild: ${guild.name}...`);
+// Quét toàn server khi bot online
+async function initRoleUpdater(client) {
+  console.log("🔄 Đang quét role tất cả thành viên...");
+  for (const [, guild] of client.guilds.cache) {
     await guild.members.fetch();
-
-    const members = guild.members.cache.filter(m => !m.user.bot);
-    let i = 0;
-
-    for (const member of members.values()) {
-      i++;
-      // Gọi xử lý role từng member
-      updateMemberRoles(member);
-      await new Promise(r => setTimeout(r, 300)); // tránh rate-limit
-    }
-
-    console.log(`✅ Đã quét ${i} thành viên khi khởi động.`);
-  });
-
-  // 🔄 Cập nhật realtime khi member thay đổi
-  client.on("guildMemberAdd", updateMemberRoles);
-  client.on("guildMemberUpdate", (_, newMember) => updateMemberRoles(newMember));
+    guild.members.cache.forEach(member => updateMemberRoles(member));
+  }
+  console.log("✅ Quét role hoàn tất!");
 }
 
-module.exports = { initRoleUpdater, updateMemberRoles };
-
-
-module.exports = { updateMemberRoles };
+module.exports = { updateMemberRoles, initRoleUpdater };
