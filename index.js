@@ -1,3 +1,13 @@
+// index.js
+const { loadCache, saveCache, getCache } = require('./utils/cacheManager');
+
+// khi bot khởi động:
+loadCache();
+
+// khi bot sắp tắt:
+process.on('exit', saveCache);
+process.on('SIGINT', () => { saveCache(); process.exit(); });
+process.on('SIGTERM', () => { saveCache(); process.exit(); });
 // ====== Discord Bot ======
 const {
   Client,
