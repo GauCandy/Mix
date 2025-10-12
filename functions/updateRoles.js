@@ -1,3 +1,6 @@
+// functions/updateRoles.js
+const { getGuildCache, saveCache } = require("../utils/cacheManager");
+
 // ===== Role Logic =====
 const BASE_ROLE_ID = "1415319898468651008";
 const AUTO_ROLE_ID = "1411240101832298569";
@@ -38,12 +41,14 @@ async function updateMemberRoles(member) {
       if (!has(id)) {
         await member.roles.add(id).catch(() => {});
         console.log(`✅ Thêm ${id} cho ${member.user.tag}`);
+        logAction(member, `+${id}`);
       }
     };
     const remove = async id => {
       if (has(id)) {
         await member.roles.remove(id).catch(() => {});
         console.log(`❌ Gỡ ${id} khỏi ${member.user.tag}`);
+        logAction(member, `-${id}`);
       }
     };
 
@@ -72,14 +77,33 @@ async function updateMemberRoles(member) {
   }
 }
 
-// khởi động quét
+// 🧠 Ghi hành động vào cache
+function logAction(member, action) {
+  const guildCache = getGuildCache(member.guild.id);
+  guildCache.lastRoleActions = guildCache.lastRoleActions || [];
+  guildCache.lastRoleActions.push({
+    user: member.user.tag,
+    userId: member.id,
+    action,
+    time: new Date().toISOString(),
+  });
+  if (guildCache.lastRoleActions.length > 100) guildCache.lastRoleActions.shift(); // giữ tối đa 100 log
+  saveCache();
+}
+
+// 🔁 Quét toàn bộ server khi bot khởi động
 async function initRoleUpdater(client) {
   console.log("🔄 Quét roles toàn bộ thành viên...");
   for (const [, guild] of client.guilds.cache) {
     await guild.members.fetch();
     for (const member of guild.members.cache.values()) updateMemberRoles(member);
   }
-  console.log("✅ Quét hoàn tất!");
+
+  // Lắng nghe sự kiện join/leave
+  client.on("guildMemberAdd", updateMemberRoles);
+  client.on("guildMemberUpdate", (_, member) => updateMemberRoles(member));
+
+  console.log("✅ Auto role system sẵn sàng!");
 }
 
 module.exports = { updateMemberRoles, initRoleUpdater };
