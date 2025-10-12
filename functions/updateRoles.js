@@ -29,7 +29,8 @@ const lastUpdate = new Map();
 
 async function updateMemberRoles(member) {
   try {
-    if (member.user.bot) return;
+    if (!member) return;
+    if (member.user && member.user.bot) return;
 
     const now = Date.now();
     if (lastUpdate.has(member.id) && now - lastUpdate.get(member.id) < 3000) return;
@@ -40,22 +41,24 @@ async function updateMemberRoles(member) {
     const add = async id => {
       if (!has(id)) {
         await member.roles.add(id).catch(() => {});
-        console.log(`✅ Thêm ${id} cho ${member.user.tag}`);
+        console.log(`✅ Thêm ${id} cho ${member.user?.tag || member.id}`);
         logAction(member, `+${id}`);
       }
     };
     const remove = async id => {
       if (has(id)) {
         await member.roles.remove(id).catch(() => {});
-        console.log(`❌ Gỡ ${id} khỏi ${member.user.tag}`);
+        console.log(`❌ Gỡ ${id} khỏi ${member.user?.tag || member.id}`);
         logAction(member, `-${id}`);
       }
     };
 
-    // SUPER LOCK
+    // SUPER LOCK: nếu user có role SUPER_LOCK thì remove hết các role trong SUPER_LOCK_REMOVABLE
     if (has(SUPER_LOCK_ROLE_ID)) {
-      for (const r of SUPER_LOCK_REMOVABLE) if (has(r)) await remove(r);
-      console.log(`🔒 ${member.user.tag} đang ở SUPER LOCK`);
+      for (const r of SUPER_LOCK_REMOVABLE) {
+        if (has(r)) await remove(r);
+      }
+      console.log(`🔒 ${member.user?.tag || member.id} đang ở SUPER LOCK`);
       return;
     }
 
@@ -65,45 +68,66 @@ async function updateMemberRoles(member) {
     const hasBlock = [...roles.keys()].some(r => BLOCK_ROLE_IDS.includes(r));
     const hasSuperRemovable = [...roles.keys()].some(r => SUPER_LOCK_REMOVABLE.includes(r));
 
-    // QUY TẮC
-    if (hasSuperRemovable && hasBase) await remove(BASE_ROLE_ID);
-    else if (!hasAuto && !hasBlock && !hasBase && !hasSuperRemovable) await add(BASE_ROLE_ID);
+    // NGUYÊN BẢN QUY TẮC:
+    // - Nếu có role trong SUPER_LOCK_REMOVABLE và có BASE_ROLE thì remove BASE_ROLE.
+    // - Ngược lại, nếu không có AUTO_ROLE, không bị block, không có BASE_ROLE, không có SUPER_REMOVABLE => add BASE_ROLE.
+    if (hasSuperRemovable && hasBase) {
+      await remove(BASE_ROLE_ID);
+    } else if (!hasAuto && !hasBlock && !hasBase && !hasSuperRemovable) {
+      await add(BASE_ROLE_ID);
+    }
 
-    if (!hasAuto && !hasRemove) await add(AUTO_ROLE_ID);
-    else if (hasAuto && hasRemove) await remove(AUTO_ROLE_ID);
+    // AUTO_ROLE logic: nếu không có AUTO_ROLE và không có REMOVE_IF_HAS_ROLE thì add AUTO_ROLE
+    // nếu có AUTO_ROLE và có REMOVE_IF_HAS_ROLE thì remove AUTO_ROLE
+    if (!hasAuto && !hasRemove) {
+      await add(AUTO_ROLE_ID);
+    } else if (hasAuto && hasRemove) {
+      await remove(AUTO_ROLE_ID);
+    }
 
   } catch (err) {
     console.error("❌ updateMemberRoles error:", err);
   }
 }
 
-// 🧠 Ghi hành động vào cache
+// Ghi hành động vào cache (không can thiệp logic)
 function logAction(member, action) {
-  const guildCache = getGuildCache(member.guild.id);
-  guildCache.lastRoleActions = guildCache.lastRoleActions || [];
-  guildCache.lastRoleActions.push({
-    user: member.user.tag,
-    userId: member.id,
-    action,
-    time: new Date().toISOString(),
-  });
-  if (guildCache.lastRoleActions.length > 100) guildCache.lastRoleActions.shift(); // giữ tối đa 100 log
-  saveCache();
+  try {
+    const guildCache = getGuildCache(member.guild.id);
+    guildCache.lastRoleActions = guildCache.lastRoleActions || [];
+    guildCache.lastRoleActions.push({
+      user: member.user?.tag || null,
+      userId: member.id,
+      action,
+      time: new Date().toISOString(),
+    });
+    if (guildCache.lastRoleActions.length > 200) guildCache.lastRoleActions.shift();
+    saveCache();
+  } catch (e) {
+    // Không cho log lỗi ảnh hưởng luồng chính
+    console.warn("logAction failed:", e.message);
+  }
 }
 
-// 🔁 Quét toàn bộ server khi bot khởi động
+// khởi động quét
 async function initRoleUpdater(client) {
   console.log("🔄 Quét roles toàn bộ thành viên...");
   for (const [, guild] of client.guilds.cache) {
-    await guild.members.fetch();
-    for (const member of guild.members.cache.values()) updateMemberRoles(member);
+    try {
+      await guild.members.fetch();
+    } catch (e) {
+      console.warn("fetch members failed for guild", guild.id, e.message);
+    }
+    for (const member of guild.members.cache.values()) {
+      // không chờ từng member một để tránh quá lâu, vẫn gọi updateMemberRoles nhưng không block hoàn toàn
+      try { updateMemberRoles(member); } catch (e) {}
+    }
   }
+  console.log("✅ Quét hoàn tất!");
 
-  // Lắng nghe sự kiện join/leave
-  client.on("guildMemberAdd", updateMemberRoles);
-  client.on("guildMemberUpdate", (_, member) => updateMemberRoles(member));
-
-  console.log("✅ Auto role system sẵn sàng!");
+  // Lắng nghe sự kiện realtime
+  client.on("guildMemberAdd", (member) => updateMemberRoles(member));
+  client.on("guildMemberUpdate", (oldMember, newMember) => updateMemberRoles(newMember));
 }
 
 module.exports = { updateMemberRoles, initRoleUpdater };
