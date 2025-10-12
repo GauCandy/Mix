@@ -1,4 +1,4 @@
-drop menu đây
+
 // events/ready.js
 const { ActionRowBuilder, StringSelectMenuBuilder, Events } = require("discord.js");
 
