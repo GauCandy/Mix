@@ -29,7 +29,6 @@ const path = require("path");
 // === Import auto role updater (tùy chọn) ===
 const { initRoleUpdater } = require("./functions/updateRoles"); // ⚙️ file riêng cho logic auto role
 
-
 // ==== Tạo Discord client ====
 const client = new Client({
   intents: [
@@ -108,11 +107,54 @@ client.once("ready", async () => {
 
 
 // ===============================
-// 🌐 KEEP ALIVE SERVER (cho hosting free như Replit)
+// 🌐 KEEP ALIVE SERVER (cho hosting free như Replit, Render)
 // ===============================
 const app = express();
 app.get("/", (req, res) => res.send("Bot vẫn online! ✅"));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Keep-alive server chạy"));
+
+
+// ===============================
+// ⚠️ HANDLER: GIỮ BOT KHÔNG BỊ “NGỦ”
+// ===============================
+
+// Khi Discord bị disconnect / lỗi / reconnect, sẽ log ra console
+client.on("reconnecting", () => console.warn("🔁 Discord client reconnecting..."));
+client.on("resume", (replayed) => console.log(`🔄 Reconnected, replayed ${replayed} events.`));
+client.on("error", (err) => console.error("❌ Discord client error:", err));
+client.on("disconnect", (event) => console.warn("⚠️ Discord client disconnected:", event));
+client.on("shardError", (error) => console.error("💥 Websocket shard error:", error));
+client.on("shardDisconnect", (event, shardId) => console.warn(`⚠️ Shard ${shardId} disconnected:`, event));
+
+// Xử lý lỗi toàn cục (ngăn node treo ngầm)
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("🚨 Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("🔥 Uncaught Exception:", err);
+  // Có thể tự restart sau 2 giây (Render sẽ khởi động lại)
+  setTimeout(() => process.exit(1), 2000);
+});
+
+// Auto-check mỗi 60s để phát hiện bot treo hoặc disconnect
+setInterval(() => {
+  try {
+    if (!client || !client.uptime) {
+      console.warn("⏰ client.uptime missing — forcing restart");
+      return process.exit(1);
+    }
+
+    const ping = client.ws?.ping;
+    if (typeof ping === "number" && ping > 10000) {
+      console.warn(`⏰ High gateway ping (${ping} ms). Restarting...`);
+      return process.exit(1);
+    }
+  } catch (err) {
+    console.error("Lỗi trong health-check interval:", err);
+    process.exit(1);
+  }
+}, 60_000);
 
 
 // ===============================
