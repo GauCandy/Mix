@@ -1,4 +1,3 @@
-
 // events/ready.js
 const { ActionRowBuilder, StringSelectMenuBuilder, Events } = require("discord.js");
 
@@ -8,26 +7,22 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
   const TARGET_ROLES = ["1410990099042271352", "1411991634194989096"];
 
   // =============================
-  // 📊 Hàm cập nhật số member online / tổng
+  // 📊 Cập nhật số thành viên online
   // =============================
   async function updatePresence() {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    // fetch members nếu cache trống
     if (guild.members.cache.size < guild.memberCount) {
       await guild.members.fetch().catch(() => {});
     }
 
     const members = guild.members.cache.filter(m => !m.user.bot && !m.roles.cache.has(BOT_ROLE_ID));
-    const totalMembers = members.size;
-    const onlineMembers = members.filter(m => m.presence && m.presence.status !== "offline").size;
+    const total = members.size;
+    const online = members.filter(m => m.presence && m.presence.status !== "offline").size;
 
     client.user.setPresence({
-      activities: [{
-        name: `${onlineMembers}/${totalMembers} Members Online 👥`,
-        type: 3 // Watching
-      }],
+      activities: [{ name: `${online}/${total} Members Online 👥`, type: 3 }],
       status: "online"
     });
   }
@@ -39,7 +34,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
     await updatePresence();
 
-    // ===== Quét toàn bộ channel trong category 1 lần khi restart =====
+    // ===== Quét toàn bộ channel trong category khi restart =====
     const channels = client.channels.cache.filter(ch => ch.parentId === CATEGORY_ID);
     for (const ch of channels.values()) {
       try {
@@ -50,7 +45,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
     }
     console.log(`🔁 Đã quét ${channels.size} channel trong category khi restart.`);
 
-    // ===== Xử lý tin nhắn menu trong channel rules =====
+    // ===== Xử lý menu rule =====
     try {
       const channel = await client.channels.fetch(RULES_CHANNEL_ID);
       if (!channel) return console.log("❌ Không tìm thấy channel rules");
@@ -66,23 +61,43 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
         console.log("⚡ Thêm menu vào tin nhắn chính...");
         const menu = new StringSelectMenuBuilder()
           .setCustomId("rules_menu")
-          .setPlaceholder("Select rules you would like to see")
+          .setPlaceholder("Select which rules you would like to see")
           .addOptions([
-            { label: "1 Warning Rules", value: "opt1", emoji: "<:x1Warn:1420078766855819284>" },
-            { label: "Channel Misuses", value: "opt2", emoji: "<:channelmisuse:1416316766312857610>" },
-            { label: "2 Warning Rules", value: "opt3", emoji: "<:x2Warn:1416316781060161556>" },
-            { label: "3 Warning Rules", value: "opt4", emoji: "<:x3Warn:1416316796029374464>" },
-            { label: "Instant Ban Rules", value: "opt5", emoji: "<:instantban:1416316818297192510>" }
+            {
+              label: "x1 Warning Rules",
+              value: "opt1",
+              emoji: "<:x1Warn:1420078766855819284>"
+            },
+            {
+              label: "Channel Misuse",
+              value: "opt2",
+              emoji: "<:channelmisuse:1416316766312857610>"
+            },
+            {
+              label: "x2 Warning Rules",
+              value: "opt3",
+              emoji: "<:x2Warn:1416316781060161556>"
+            },
+            {
+              label: "x3 Warning Rules",
+              value: "opt4",
+              emoji: "<:x3Warn:1416316796029374464>"
+            },
+            {
+              label: "Instant Ban Rules",
+              value: "opt5",
+              emoji: "<:instantban:1416316818297192510>"
+            }
           ]);
 
         const row = new ActionRowBuilder().addComponents(menu);
         await mainMessage.edit({
           content: "📜 **Server Rules are pinned here:**",
           embeds: mainMessage.embeds,
-          components: [row],
+          components: [row]
         });
 
-        console.log("✅ Đã thêm menu vào embed chính.");
+        console.log("✅ Đã thêm menu rules vào embed chính.");
       } else {
         console.log("📌 Tin nhắn menu đã có sẵn → bỏ qua.");
       }
@@ -92,7 +107,7 @@ module.exports = (client, CATEGORY_ID, RULES_CHANNEL_ID, renameChannel) => {
   });
 
   // =============================
-  // 🔄 Cập nhật khi có thay đổi thành viên / trạng thái
+  // 🔄 Cập nhật trạng thái
   // =============================
   client.on(Events.GuildMemberAdd, updatePresence);
   client.on(Events.GuildMemberRemove, updatePresence);
