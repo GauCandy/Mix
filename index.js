@@ -27,16 +27,16 @@ const fs = require("fs");
 const path = require("path");
 
 // === Import auto role updater (tùy chọn) ===
-const { initRoleUpdater } = require("./functions/updateRoles"); // ⚙️ file riêng cho logic auto role
+const { initRoleUpdater } = require("./functions/updateRoles");
 
 // ==== Tạo Discord client ====
 const client = new Client({
   intents: [
-    GatewayIntentBits.Guilds,           // Quản lý server
-    GatewayIntentBits.GuildMembers,     // Theo dõi member join/leave
-    GatewayIntentBits.GuildMessages,    // Theo dõi tin nhắn
-    GatewayIntentBits.MessageContent,   // Đọc nội dung tin nhắn
-    GatewayIntentBits.GuildPresences,   // Theo dõi trạng thái online/offline
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildPresences,
   ],
   partials: [
     Partials.Message,
@@ -96,18 +96,23 @@ if (fs.existsSync(eventsPath)) {
 
 
 // ===============================
-// 🟢 BOT ONLINE
+// 🟢 BOT READY
 // ===============================
 client.once("ready", async () => {
   console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+  
+  // Chạy auto role updater (nếu có)
   if (typeof initRoleUpdater === 'function') {
-    await initRoleUpdater(client); // 🔁 chạy auto role updater
+    await initRoleUpdater(client);
   }
+
+  // ✅ Quét 1 lần khi restart (ví dụ cập nhật dữ liệu)
+  client.emit("cacheReload");
 });
 
 
 // ===============================
-// 🌐 KEEP ALIVE SERVER (cho hosting free như Replit, Render)
+// 🌐 KEEP ALIVE SERVER
 // ===============================
 const app = express();
 app.get("/", (req, res) => res.send("Bot vẫn online! ✅"));
@@ -115,29 +120,25 @@ app.listen(process.env.PORT || 3000, () => console.log("🌐 Keep-alive server c
 
 
 // ===============================
-// ⚠️ HANDLER: GIỮ BOT KHÔNG BỊ “NGỦ”
+// ⚠️ GIỮ BOT KHỎE VÀ ỔN ĐỊNH
 // ===============================
-
-// Khi Discord bị disconnect / lỗi / reconnect, sẽ log ra console
-client.on("reconnecting", () => console.warn("🔁 Discord client reconnecting..."));
+client.on("reconnecting", () => console.warn("🔁 Discord reconnecting..."));
 client.on("resume", (replayed) => console.log(`🔄 Reconnected, replayed ${replayed} events.`));
 client.on("error", (err) => console.error("❌ Discord client error:", err));
-client.on("disconnect", (event) => console.warn("⚠️ Discord client disconnected:", event));
+client.on("disconnect", (event) => console.warn("⚠️ Discord disconnected:", event));
 client.on("shardError", (error) => console.error("💥 Websocket shard error:", error));
 client.on("shardDisconnect", (event, shardId) => console.warn(`⚠️ Shard ${shardId} disconnected:`, event));
 
-// Xử lý lỗi toàn cục (ngăn node treo ngầm)
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason) => {
   console.error("🚨 Unhandled Promise Rejection:", reason);
 });
 
 process.on("uncaughtException", (err) => {
   console.error("🔥 Uncaught Exception:", err);
-  // Có thể tự restart sau 2 giây (Render sẽ khởi động lại)
   setTimeout(() => process.exit(1), 2000);
 });
 
-// Auto-check mỗi 60s để phát hiện bot treo hoặc disconnect
+// Auto-check health mỗi 60s
 setInterval(() => {
   try {
     if (!client || !client.uptime) {
