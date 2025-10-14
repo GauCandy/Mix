@@ -12,41 +12,45 @@ function createHelpEmbed() {
 
     // I. HỆ THỐNG & THÔNG TIN
     .addFields({
-      name: "I. HỆ THỐNG & THÔNG TIN — <@1417797395634196521>",
+      name: "I. HỆ THỐNG & THÔNG TIN",
       value:
+        " <@1417797395634196521> - <@720351927581278219> \n" +
         "`/report` — Báo cáo người dùng vi phạm\n" +
-        "`/findlink` — Lấy link mời server (<@720351927581278219>)",
+        "`/findlink` — Lấy link mời server",
       inline: false,
     })
 
     // II. LEVEL & XẾP HẠNG
     .addFields({
-      name: "II. LEVEL & XẾP HẠNG — <@437808476106784770>",
+      name: "II. LEVEL & XẾP HẠNG",
       value:
+        " <@437808476106784770> - <@720351927581278219> \n" +
         "`/level (@user)` — Xem level tương tác hiện tại\n" +
         "`/leaderboard` — Bảng xếp hạng top 10 level cao nhất\n" +
         "`/rank` — Tương tự `/level`\n" +
-        "`/leaderboard message` — Top người gửi nhiều tin nhắn nhất (<@720351927581278219>)\n" +
-        "`/leaderboard invites` — Top người mời nhiều nhất (<@720351927581278219>)",
+        "`/leaderboard message` — Top người gửi nhiều tin nhắn nhất \n" +
+        "`/leaderboard invites` — Top người mời nhiều nhất",
       inline: false,
     })
 
     // III. HỆ THỐNG SOL'S RNG (GLOBAL / AURA)
     .addFields({
-      name: "III. HỆ THỐNG SOL'S RNG (GLOBAL / AURA) — <@1380356714225995776>",
+      name: "III. HỆ THỐNG SOL'S RNG (GLOBAL / AURA)",
       value:
+        " <@1380356714225995776> - <@1365663330160611490> \n" +
         "`/link` — Liên kết tài khoản Roblox của bạn với bot\n" +
-        "`/statsfound discord_user (@user)` — Xem global aura của người dùng Discord (<@1365663330160611490>)\n" +
-        "`/statsfound roblox_username (tên Roblox)` — Xem global aura theo tài khoản Roblox (<@1365663330160611490>)\n" +
-        "`/collectedstatsfound` — Xem bảng xếp hạng người có collected stats cao nhất (<@1365663330160611490>)\n" +
-        "`/auracounts` — Xem top những aura được sở hữu nhiều nhất (<@1365663330160611490>)",
+        "`/statsfound discord_user (@user)` — Xem global aura của người dùng Discord\n" +
+        "`/statsfound roblox_username (tên Roblox)` — Xem global aura theo tài khoản Roblox\n" +
+        "`/collectedstatsfound` — Xem bảng xếp hạng người có collected stats cao nhất\n" +
+        "`/auracounts` — Xem top những aura được sở hữu nhiều nhất",
       inline: false,
     })
 
     // IV. KINH TẾ & GIẢI TRÍ
     .addFields({
-      name: "IV. KINH TẾ & GIẢI TRÍ — <@172002275412279296>",
+      name: "IV. KINH TẾ & GIẢI TRÍ —",
       value:
+        " <@172002275412279296> \n" +
         "`t!points` — Kiểm tra điểm tương tác của bạn\n" +
         "`t!wallet` — Xem ví toàn cầu\n" +
         "`t!inventory` — Xem kho đồ của bạn\n" +
@@ -67,8 +71,9 @@ function createHelpEmbed() {
 
     // V. ÂM NHẠC
     .addFields({
-      name: "V. ÂM NHẠC — <@412347257233604609>",
+      name: "V. ÂM NHẠC",
       value:
+        " <@412347257233604609> \n" +
         "`/play <link>` — Phát nhạc từ link\n" +
         "`/pause` — Tạm dừng phát nhạc\n" +
         "`/resume` — Tiếp tục phát\n" +
@@ -78,14 +83,14 @@ function createHelpEmbed() {
 
     // VI. QUY ĐỊNH & HỖ TRỢ
     .addFields({
-      name: "VI. QUY ĐỊNH & HỖ TRỢ — <@1417797395634196521>",
+      name: "VI. QUY ĐỊNH & HỖ TRỢ",
       value:
         "Khi sử dụng bot trong **SuperNova Citadel**, bạn cần tuân thủ các quy tắc sau:\n" +
         "- Không spam hoặc ping bot liên tục.\n" +
         "- Không lợi dụng bug hoặc tính năng chưa hoàn thiện.\n" +
         "- Không gửi nội dung phản cảm, gây khó chịu hoặc độc hại.\n" +
         "- Tuân thủ nội quy server và hướng dẫn từ quản trị viên.\n\n" +
-        "Nếu bạn gặp sự cố hoặc lỗi, hãy báo qua `/report` hoặc liên hệ với đội ngũ quản trị viên.",
+        "Nếu bạn gặp sự cố hoặc lỗi, hãy báo qua hãy qua server  hoặc liên hệ với đội ngũ quản trị viên.",
       inline: false,
     })
 
