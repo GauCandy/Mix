@@ -26,6 +26,13 @@ const SUPER_LOCK_HIDE_CHANNELS = [
   "1419725102412726292"
 ];
 
+// === Role conflict logic mới ===
+const BLOCK_TRIGGER_ROLE = "1428898880447316159";
+const BLOCK_CONFLICT_ROLES = [
+  "1428899156956549151",
+  AUTO_ROLE_ID // "1411240101832298569"
+];
+
 const lastUpdate = new Map();
 
 async function updateMemberRoles(member) {
@@ -59,7 +66,6 @@ async function updateMemberRoles(member) {
         const channel = member.guild.channels.cache.get(channelId);
         if (!channel) continue;
         const perms = channel.permissionOverwrites.cache.get(member.id);
-        // Nếu chưa deny VIEW_CHANNEL thì thêm deny
         if (!perms || !perms.deny.has("ViewChannel")) {
           await channel.permissionOverwrites
             .edit(member.id, { ViewChannel: false })
@@ -74,9 +80,7 @@ async function updateMemberRoles(member) {
         if (!channel) continue;
         const overwrite = channel.permissionOverwrites.cache.get(member.id);
         if (overwrite) {
-          await channel.permissionOverwrites
-            .delete(member.id)
-            .catch(() => {});
+          await channel.permissionOverwrites.delete(member.id).catch(() => {});
           console.log(`✅ Hiện lại kênh ${channel.name} cho ${member.user.tag}`);
         }
       }
@@ -87,6 +91,16 @@ async function updateMemberRoles(member) {
     const hasAuto = has(AUTO_ROLE_ID);
     const hasRemove = has(REMOVE_IF_HAS_ROLE_ID);
     const hasBlock = [...roles.keys()].some(r => BLOCK_ROLE_IDS.includes(r));
+
+    // 🚫 Nếu có BLOCK_TRIGGER_ROLE → gỡ các role xung đột
+    if (has(BLOCK_TRIGGER_ROLE)) {
+      for (const id of BLOCK_CONFLICT_ROLES) {
+        if (has(id)) {
+          await remove(id);
+          console.log(`🚫 ${member.user.tag} có ${BLOCK_TRIGGER_ROLE} nên gỡ ${id}`);
+        }
+      }
+    }
 
     // 1️⃣ Nếu có cả AUTO và BASE => gỡ BASE
     if (hasBase && hasAuto) {
@@ -144,7 +158,6 @@ async function initRoleUpdater(client) {
 // === Sự kiện theo dõi thay đổi role ===
 function registerRoleEvents(client) {
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
-    // Chỉ xử lý khi roles thay đổi
     if (
       oldMember.roles.cache.size !== newMember.roles.cache.size ||
       [...oldMember.roles.cache.keys()].some(id => !newMember.roles.cache.has(id)) ||
