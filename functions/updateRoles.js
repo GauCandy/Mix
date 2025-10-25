@@ -1,4 +1,3 @@
-// functions/updateRoles.js
 const { getGuildCache, saveCache } = require("../utils/cacheManager");
 
 // ===== Role Logic =====
@@ -9,12 +8,12 @@ const SUPER_LOCK_ROLE_ID = "1411991634194989096"; // giờ chỉ để ẩn kên
 
 // Danh sách role block
 const BLOCK_ROLE_IDS = [
-  "1411639327909220352","1411085492631506996","1418990676749848576","1410988790444458015",
-  "1415322209320435732","1415351613534503022","1415350650165924002","1415320304569290862",
-  "1415351362866380881","1415351226366689460","1415322385095332021","1415351029305704498",
-  "1415350143800049736","1415350765291307028","1418990664762523718","1417802085378031689",
-  "1417097393752506398","1420270612785401988","1420276021009322064","1415350457706217563",
-  "1415320854014984342","1414165862205751326"
+  "1411639327909220352", "1411085492631506996", "1418990676749848576", "1410988790444458015",
+  "1415322209320435732", "1415351613534503022", "1415350650165924002", "1415320304569290862",
+  "1415351362866380881", "1415351226366689460", "1415322385095332021", "1415351029305704498",
+  "1415350143800049736", "1415350765291307028", "1418990664762523718", "1417802085378031689",
+  "1417097393752506398", "1420270612785401988", "1420276021009322064", "1415350457706217563",
+  "1415320854014984342", "1414165862205751326"
 ];
 
 // SUPER LOCK chỉ ẩn các kênh sau
@@ -27,7 +26,7 @@ const SUPER_LOCK_HIDE_CHANNELS = [
 ];
 
 // === Role conflict logic mới ===
-const BLOCK_TRIGGER_ROLE = "1428898880447316159"; // chỉ khi có role này mới được add BASE
+const BLOCK_TRIGGER_ROLE = "1428898880447316159"; // role cần thiết
 const BLOCK_CONFLICT_ROLES = [
   "1428899156956549151",
   AUTO_ROLE_ID // "1411240101832298569"
@@ -115,6 +114,32 @@ async function updateMemberRoles(member) {
       await add(AUTO_ROLE_ID);
     } else if (hasAuto && (hasRemove || hasTrigger)) {
       await remove(AUTO_ROLE_ID);
+    }
+
+    // ======= 🔁 NÂNG CẤP ROLE DỰA TRÊN ROLE CẦN THIẾT =======
+    const REQUIRED_ROLE = "1428898880447316159"; // role cần thiết
+
+    const roleUpgradeMap = {
+      "1431525750724362330": "1428899630753775626", // #1 -> #1.1
+      "1431525792365547540": "1410990099042271352", // #2 -> #2.1
+      "1431525824082870272": "1428899344010182756", // #3 -> #3.1
+      "1431525863987613877": "1428418711764865156", // #4 -> #4.1
+      "1431525890587885698": "1431525947684950016", // #5 -> #5.1
+    };
+
+    if (has(REQUIRED_ROLE)) {
+      const ownedNormalRoles = Object.keys(roleUpgradeMap).filter(id => has(id));
+      for (const normalRole of ownedNormalRoles) {
+        const upgradedRole = roleUpgradeMap[normalRole];
+        await remove(normalRole);
+        await add(upgradedRole);
+      }
+
+      if (ownedNormalRoles.length > 0) {
+        console.log(
+          `🔁 ${member.user.tag} có ${REQUIRED_ROLE} → đã nâng cấp ${ownedNormalRoles.length} role.`
+        );
+      }
     }
 
   } catch (err) {
