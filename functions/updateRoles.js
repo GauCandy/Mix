@@ -29,9 +29,10 @@ const ROLE_UPGRADE_MAP = {
 const BLOCK_TRIGGER_ROLE = "1428898880447316159";
 const BLOCK_CONFLICT_ROLES = ["1428899156956549151", AUTO_ROLE_ID];
 
-// Quan hệ cha–con
+// Quan hệ cha–con (bao gồm role upgrade)
 const ROLE_HIERARCHY = [
-  { parent: "1431525792365547540", child: "1431697157437784074" }
+  { parent: "1431525792365547540", child: "1431697157437784074" },
+  ...Object.entries(ROLE_UPGRADE_MAP).map(([parent, child]) => ({ parent, child }))
 ];
 
 // ====== Cache ======
@@ -39,9 +40,7 @@ const lastUpdate = new Map();
 
 // ====== Hàm fetch member an toàn ======
 async function safeFetch(member) {
-  try {
-    await member.fetch(true);
-  } catch {}
+  try { await member.fetch(true); } catch {}
 }
 
 // ====== Hàm cập nhật roles ======
@@ -102,7 +101,6 @@ async function updateMemberRoles(member) {
 
     // 🧠 Kiểm tra quan hệ cha–con
     for (const { parent, child } of ROLE_HIERARCHY) {
-      console.log(`🔍 [ROLE HIERARCHY] ${member.user.tag}: cóCha=${has(parent)} | cóCon=${has(child)}`);
       if (!has(parent) && has(child)) {
         console.log(`🚨 [ROLE HIERARCHY] ${member.user.tag} mất ${parent}, xoá ${child}`);
         await member.roles.remove(child, "Mất role cha nên xoá role con").catch(err => {
