@@ -66,9 +66,7 @@ async function updateMemberRoles(member) {
         if (!channel) continue;
         const perms = channel.permissionOverwrites.cache.get(member.id);
         if (!perms || !perms.deny.has("ViewChannel")) {
-          await channel.permissionOverwrites
-            .edit(member.id, { ViewChannel: false })
-            .catch(() => {});
+          await channel.permissionOverwrites.edit(member.id, { ViewChannel: false }).catch(() => {});
           console.log(`🔒 Ẩn kênh ${channel.name} cho ${member.user.tag}`);
         }
       }
@@ -127,18 +125,20 @@ async function updateMemberRoles(member) {
       "1431525890587885698": "1431525947684950016", // #5 -> #5.1
     };
 
+    // 🔁 Nếu có role cần thiết → thêm role nâng cấp tương ứng, KHÔNG xoá role thường
     if (has(REQUIRED_ROLE)) {
-      const ownedNormalRoles = Object.keys(roleUpgradeMap).filter(id => has(id));
-      for (const normalRole of ownedNormalRoles) {
-        const upgradedRole = roleUpgradeMap[normalRole];
-        await remove(normalRole);
-        await add(upgradedRole);
+      for (const [normalRole, upgradedRole] of Object.entries(roleUpgradeMap)) {
+        if (has(normalRole)) {
+          await add(upgradedRole); // thêm #x.1
+        }
       }
+    }
 
-      if (ownedNormalRoles.length > 0) {
-        console.log(
-          `🔁 ${member.user.tag} có ${REQUIRED_ROLE} → đã nâng cấp ${ownedNormalRoles.length} role.`
-        );
+    // 🔁 Nếu người chơi mất role thường → xoá role nâng cấp tương ứng
+    for (const [normalRole, upgradedRole] of Object.entries(roleUpgradeMap)) {
+      if (!has(normalRole) && has(upgradedRole)) {
+        await remove(upgradedRole);
+        console.log(`🔻 ${member.user.tag} mất ${normalRole} → gỡ ${upgradedRole}`);
       }
     }
 
