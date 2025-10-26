@@ -7,9 +7,10 @@ module.exports = client => {
   });
 
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
-    try {
-      const oldRoles = [...oldMember.roles.cache.keys()];
-      const newRoles = [...newMember.roles.cache.keys()];
+  try {
+    // 🧭 Bắt buộc fetch lại để cập nhật roles chính xác
+    await newMember.fetch(true).catch(() => {});
+
 
       const lostRoles = oldRoles.filter(id => !newRoles.includes(id));
       const gainedRoles = newRoles.filter(id => !oldRoles.includes(id));
