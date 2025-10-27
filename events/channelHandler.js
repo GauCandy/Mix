@@ -1,42 +1,41 @@
-// events/channelHandler.js
 const { renameChannelByCategory } = require("../functions/rename");
 
 const CATEGORY_1 = "1411034825699233943"; // danh mục hoạt động
 const CATEGORY_2 = "1427958263281881088"; // danh mục ngủ
-const INACTIVITY_TIME = 1000 * 60 * 60 * 24; // 1 ngày không có webhook
+const INACTIVITY_TIME = 1000 * 60 * 60 * 24; // 1 ngày
 
 module.exports = (client) => {
   const inactivityTimers = new Map();
 
-  // ===== Khi webhook gửi tin nhắn =====
+  // ===== Khi webhook gửi tin =====
   client.on("messageCreate", async (msg) => {
     try {
       if (!msg.webhookId) return;
       const channel = msg.channel;
       if (!channel || !channel.parentId) return;
 
-      // 🟢 Auto rename mỗi khi có webhook gửi tin (đảm bảo tên luôn đúng)
+      // Auto rename khi có webhook
       await renameChannelByCategory(channel);
 
-      // Nếu có timer cũ thì reset lại
-      if (inactivityTimers.has(channel.id))
-        clearTimeout(inactivityTimers.get(channel.id));
+      if (inactivityTimers.has(channel.id)) clearTimeout(inactivityTimers.get(channel.id));
 
-      // Nếu webhook hoạt động trong danh mục ngủ → chuyển về danh mục hoạt động
+      // Nếu webhook trong danh mục 2 → chuyển về danh mục 1
       if (channel.parentId === CATEGORY_2) {
         await channel.setParent(CATEGORY_1, { lockPermissions: false }).catch(() => {});
-        await new Promise((r) => setTimeout(r, 1000)); // đợi Discord cập nhật parent
-        await renameChannelByCategory(channel);
-        console.log(`🔄 Đưa ${channel.name} về danh mục hoạt động (do có webhook mới)`);
+        setTimeout(async () => {
+          await renameChannelByCategory(channel);
+        }, 1000);
+        console.log(`🔄 Đưa ${channel.name} → danh mục hoạt động (do có webhook mới)`);
       }
 
-      // Đặt lại hẹn giờ 1 ngày không hoạt động
+      // Reset hẹn giờ 1 ngày
       const timer = setTimeout(async () => {
         try {
           if (channel.parentId === CATEGORY_1) {
             await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise((r) => setTimeout(r, 1000));
-            await renameChannelByCategory(channel);
+            setTimeout(async () => {
+              await renameChannelByCategory(channel);
+            }, 1000);
             console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
           }
         } catch (err) {
@@ -50,36 +49,25 @@ module.exports = (client) => {
     }
   });
 
-  // ===== Khi kênh được tạo =====
+  // ===== Khi channel được tạo =====
   client.on("channelCreate", async (channel) => {
     try {
       await renameChannelByCategory(channel);
-
-      if (channel.parentId === CATEGORY_1) {
-        const timer = setTimeout(async () => {
-          try {
-            await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise((r) => setTimeout(r, 1000));
-            await renameChannelByCategory(channel);
-            console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
-          } catch (err) {
-            console.error("❌ Lỗi khi chuyển danh mục:", err);
-          }
-        }, INACTIVITY_TIME);
-
-        inactivityTimers.set(channel.id, timer);
-      }
     } catch (err) {
       console.error("❌ Lỗi channelCreate:", err);
     }
   });
 
-  // ===== Khi kênh được chuyển danh mục (thủ công) =====
+  // ===== Khi kênh được đổi danh mục (thủ công hoặc bot) =====
   client.on("channelUpdate", async (oldCh, newCh) => {
     try {
       if (!newCh || newCh.type !== 0) return;
+
+      // Khi parentId đổi, đợi Discord cập nhật rồi rename
       if (oldCh.parentId !== newCh.parentId) {
-        await renameChannelByCategory(newCh);
+        setTimeout(async () => {
+          await renameChannelByCategory(newCh);
+        }, 1000); // đợi 1s để đảm bảo parentId sync
       }
     } catch (err) {
       console.error("❌ Lỗi channelUpdate:", err);
