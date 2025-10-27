@@ -9,22 +9,18 @@ async function renameChannelByCategory(channel) {
     const [username] = channel.topic.split(" ");
     if (!username) return;
 
-    // Nếu đang ở danh mục 1
+    // Xác định tên mong muốn
+    let expectedName;
     if (channel.parentId === CATEGORY_1) {
-      const newName = `🛠★】${username}-macro`;
-      if (channel.name !== newName) {
-        await channel.setName(newName).catch(() => {});
-        console.log(`🛠 Đổi tên: ${channel.name} → ${newName} (vào danh mục 1)`);
-      }
-    }
+      expectedName = `🛠★】${username}-macro`;
+    } else if (channel.parentId === CATEGORY_2) {
+      expectedName = `⏰★】${username}-macro`;
+    } else return;
 
-    // Nếu đang ở danh mục 2
-    else if (channel.parentId === CATEGORY_2) {
-      const newName = `⏰★】${username}-macro`;
-      if (channel.name !== newName) {
-        await channel.setName(newName).catch(() => {});
-        console.log(`⏰ Đổi tên: ${channel.name} → ${newName} (vào danh mục 2)`);
-      }
+    // Nếu khác với tên hiện tại (hoặc chưa đúng prefix) thì đổi
+    if (!channel.name.includes(expectedName.split("】")[0])) {
+      await channel.setName(expectedName).catch(() => {});
+      console.log(`🔄 Đổi tên kênh: ${channel.name} → ${expectedName}`);
     }
   } catch (err) {
     console.error("❌ Lỗi renameChannelByCategory:", err);
