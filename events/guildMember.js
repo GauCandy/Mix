@@ -1,53 +1,41 @@
 const { updateMemberRoles } = require("../functions/updateRoles");
-
-const queue = new Map(); // lưu hàng đợi cho từng người
+const queue = new Map(); // Queue xử lý từng user
 
 module.exports = client => {
-  // Khi thành viên mới vào server
-  client.on("guildMemberAdd", async member => {
-    if (!member || member.user?.bot) return;
+  client.on("guildMemberAdd", member => {
     console.log(`✅ [JOIN] ${member.user.tag} đã vào server`);
-    await updateMemberRoles(member);
+    updateMemberRoles(member);
   });
 
-  // Khi role bị thay đổi
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
-      if (!newMember || newMember.user?.bot) return;
-
-      // Bắt buộc fetch roles mới
+      // 🧭 Luôn fetch lại roles mới nhất
       await newMember.fetch(true).catch(() => {});
 
       const oldRoles = [...oldMember.roles.cache.keys()];
       const newRoles = [...newMember.roles.cache.keys()];
-
       const lostRoles = oldRoles.filter(id => !newRoles.includes(id));
       const gainedRoles = newRoles.filter(id => !oldRoles.includes(id));
 
-      if (lostRoles.length === 0 && gainedRoles.length === 0) return;
+      if (!lostRoles.length && !gainedRoles.length) return;
 
-      console.log(`\n🔄 [UPDATE] ${newMember.user.tag}`);
+      console.log(`🔄 [UPDATE] ${newMember.user.tag}`);
       if (lostRoles.length) console.log(`🧹 Mất roles: ${lostRoles.join(", ")}`);
       if (gainedRoles.length) console.log(`✨ Nhận roles: ${gainedRoles.join(", ")}`);
 
-      // Nếu đang có request đang chạy cho user này, thì thêm vào queue
-      if (queue.has(newMember.id)) {
-        queue.get(newMember.id).push(() => updateMemberRoles(newMember));
-        return;
-      }
+      // 🧠 Gom request theo user để tránh nghẽn
+      const userId = newMember.id;
+      if (!queue.has(userId)) queue.set(userId, Promise.resolve());
 
-      // Nếu chưa có hàng đợi thì tạo mới
-      queue.set(newMember.id, []);
-      await updateMemberRoles(newMember);
+      const last = queue.get(userId);
+      const next = (async () => {
+        // Chờ 300ms giữa mỗi lần để tránh API spam
+        await last.catch(() => {});
+        await new Promise(r => setTimeout(r, 300));
+        await updateMemberRoles(newMember);
+      })();
 
-      // Sau khi xong, kiểm tra xem còn request chờ không
-      while (queue.get(newMember.id).length > 0) {
-        const next = queue.get(newMember.id).shift();
-        await new Promise(res => setTimeout(res, 1000)); // nghỉ 1s tránh rate limit
-        await next();
-      }
-
-      queue.delete(newMember.id);
+      queue.set(userId, next);
     } catch (err) {
       console.error(`❌ [guildMemberUpdate] Lỗi khi xử lý ${newMember.user?.tag}:`, err);
     }
