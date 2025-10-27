@@ -1,5 +1,7 @@
 const { updateMemberRoles } = require("../functions/updateRoles");
 
+const queue = new Map(); // lưu hàng đợi cho từng người
+
 module.exports = client => {
   // Khi thành viên mới vào server
   client.on("guildMemberAdd", async member => {
@@ -13,7 +15,7 @@ module.exports = client => {
     try {
       if (!newMember || newMember.user?.bot) return;
 
-      // Bắt buộc fetch lại roles mới để đảm bảo chính xác
+      // Bắt buộc fetch roles mới
       await newMember.fetch(true).catch(() => {});
 
       const oldRoles = [...oldMember.roles.cache.keys()];
@@ -22,25 +24,30 @@ module.exports = client => {
       const lostRoles = oldRoles.filter(id => !newRoles.includes(id));
       const gainedRoles = newRoles.filter(id => !oldRoles.includes(id));
 
-      // Nếu không có thay đổi roles thì bỏ qua
       if (lostRoles.length === 0 && gainedRoles.length === 0) return;
 
-      // In log đẹp và dễ nhìn
       console.log(`\n🔄 [UPDATE] ${newMember.user.tag}`);
       if (lostRoles.length) console.log(`🧹 Mất roles: ${lostRoles.join(", ")}`);
       if (gainedRoles.length) console.log(`✨ Nhận roles: ${gainedRoles.join(", ")}`);
 
-      // Giới hạn tốc độ xử lý để tránh spam (anti rate limit)
-      newMember._lastUpdate = newMember._lastUpdate || 0;
-      const now = Date.now();
-      if (now - newMember._lastUpdate < 1500) {
-        console.log(`⚠️ [SKIP] Bỏ qua ${newMember.user.tag} do cập nhật quá nhanh`);
+      // Nếu đang có request đang chạy cho user này, thì thêm vào queue
+      if (queue.has(newMember.id)) {
+        queue.get(newMember.id).push(() => updateMemberRoles(newMember));
         return;
       }
-      newMember._lastUpdate = now;
 
-      // Gọi hàm xử lý chính
+      // Nếu chưa có hàng đợi thì tạo mới
+      queue.set(newMember.id, []);
       await updateMemberRoles(newMember);
+
+      // Sau khi xong, kiểm tra xem còn request chờ không
+      while (queue.get(newMember.id).length > 0) {
+        const next = queue.get(newMember.id).shift();
+        await new Promise(res => setTimeout(res, 1000)); // nghỉ 1s tránh rate limit
+        await next();
+      }
+
+      queue.delete(newMember.id);
     } catch (err) {
       console.error(`❌ [guildMemberUpdate] Lỗi khi xử lý ${newMember.user?.tag}:`, err);
     }
