@@ -1,7 +1,9 @@
-const { renameChannel } = require("../functions/rename");
+// handlers/autoHideHandler.js
+const { renameChannelByCategory } = require("../functions/rename");
 
-const CATEGORY_ID = process.env.CATEGORY_ID;   // ID category chứa channel
-const ROLE_ID = process.env.AUTO_ROLE_ID;      // Role auto add khi tạo channel
+const CATEGORY_1 = process.env.CATEGORY_ID; // Danh mục 1
+const CATEGORY_2 = "1427958263281881088";   // Danh mục 2
+const ROLE_ID = process.env.AUTO_ROLE_ID;    // Role auto add khi tạo channel
 const TARGET_ROLES = ["1410990099042271352", "1411991634194989096"]; // 2 role bật/tắt ViewChannel
 
 // Map lưu timer cho từng channel
@@ -12,9 +14,9 @@ module.exports = (client) => {
   // ===== Khi channel mới được tạo =====
   client.on("channelCreate", async (channel) => {
     try {
-      if (channel.parentId !== CATEGORY_ID) return;
+      if (![CATEGORY_1, CATEGORY_2].includes(channel.parentId)) return;
 
-      await renameChannel(channel, CATEGORY_ID);
+      await renameChannelByCategory(channel); // ← rename dựa trên topic
 
       if (!channel.topic) return;
       const match = channel.topic.match(/(\d{17,19})$/);
@@ -25,9 +27,23 @@ module.exports = (client) => {
       if (!member) return;
 
       await member.roles.add(ROLE_ID).catch(() => {});
-      console.log(`✅ Đã add role ${ROLE_ID} cho ${member.user.tag} khi tạo channel`);
+      console.log(`✅ Add role ${ROLE_ID} cho ${member.user.tag} khi tạo channel`);
     } catch (err) {
       console.error("❌ Lỗi channelCreate:", err);
+    }
+  });
+
+  // ===== Khi channel được chuyển danh mục =====
+  client.on("channelUpdate", async (oldChannel, newChannel) => {
+    try {
+      // Nếu danh mục khác nhau → rename lại
+      if (oldChannel.parentId !== newChannel.parentId) {
+        if ([CATEGORY_1, CATEGORY_2].includes(newChannel.parentId)) {
+          await renameChannelByCategory(newChannel);
+        }
+      }
+    } catch (err) {
+      console.error("❌ Lỗi channelUpdate:", err);
     }
   });
 
@@ -35,7 +51,7 @@ module.exports = (client) => {
   client.on("messageCreate", async (message) => {
     try {
       const channel = message.channel;
-      if (channel.parentId !== CATEGORY_ID) return;
+      if (![CATEGORY_1, CATEGORY_2].includes(channel.parentId)) return;
 
       if (!channel.topic) return;
       const match = channel.topic.match(/(\d{17,19})$/);
@@ -114,7 +130,6 @@ module.exports = (client) => {
         channelTimers.set(channel.id, timer);
         console.log(`✅ Channel ${channel.name} mở lại do user nhắn`);
       }
-
     } catch (err) {
       console.error("❌ Lỗi messageCreate:", err);
     }
@@ -123,7 +138,7 @@ module.exports = (client) => {
   // ===== Khi channel bị xóa =====
   client.on("channelDelete", async (channel) => {
     try {
-      if (channel.parentId !== CATEGORY_ID) return;
+      if (![CATEGORY_1, CATEGORY_2].includes(channel.parentId)) return;
       if (!channel.topic) return;
 
       const match = channel.topic.match(/(\d{17,19})$/);
