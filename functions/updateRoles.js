@@ -32,32 +32,29 @@ const BLOCK_CONFLICT_ROLES = ["1428899156956549151", AUTO_ROLE_ID];
 const ROLE_HIERARCHY = [
   { parent: "1431525792365547540", child: "1431697157437784074" }
 ];
-
-// Tự động thêm các cặp role nâng cấp vào danh sách cha–con
 for (const [parent, child] of Object.entries(ROLE_UPGRADE_MAP)) {
   ROLE_HIERARCHY.push({ parent, child });
 }
 
-// ====== Cache tránh spam ======
+// ====== Cache chống spam ======
 const lastUpdate = new Map();
-const UPDATE_COOLDOWN = 4000; // ms
+const UPDATE_COOLDOWN = 4000; // 4s mỗi member
 
-// ====== Hàm fetch an toàn ======
 async function safeFetch(member) {
-  try {
-    await member.fetch(true);
-  } catch {}
+  try { await member.fetch(true); } catch {}
 }
 
 // ====== Hàm cập nhật roles ======
 async function updateMemberRoles(member) {
   try {
     if (!member || member.user?.bot) return;
-
     await safeFetch(member);
 
     const now = Date.now();
-    if (lastUpdate.has(member.id) && now - lastUpdate.get(member.id) < UPDATE_COOLDOWN) return;
+    if (lastUpdate.has(member.id) && now - lastUpdate.get(member.id) < UPDATE_COOLDOWN) {
+      console.log(`⚠️ [SKIP] Bỏ qua ${member.user.tag} do cooldown`);
+      return;
+    }
     lastUpdate.set(member.id, now);
 
     const roles = member.roles.cache;
@@ -107,10 +104,37 @@ async function updateMemberRoles(member) {
       }
     }
 
+    // 🧩 Kiểm tra thiếu base/nâng cấp (fix quan trọng)
+    for (const [normal, upgraded] of Object.entries(ROLE_UPGRADE_MAP)) {
+      const hasNormal = has(normal);
+      const hasUpgraded = has(upgraded);
+
+      // Nếu không có cả hai → thêm base
+      if (!hasNormal && !hasUpgraded) {
+        console.log(`🪶 Thêm role base ${normal} vì bị thiếu cả hai`);
+        toAdd.add(normal);
+      }
+
+      // Nếu có base mà thiếu upgrade + có REQUIRED_ROLE → thêm upgrade
+      if (hasNormal && !hasUpgraded && has(REQUIRED_ROLE)) {
+        console.log(`⏫ Thêm role nâng cấp ${upgraded} vì thiếu nâng cấp`);
+        toAdd.add(upgraded);
+      }
+
+      // Nếu có upgrade mà thiếu base → xoá upgrade
+      if (!hasNormal && hasUpgraded) {
+        console.log(`🧹 Gỡ role nâng cấp ${upgraded} vì mất role base ${normal}`);
+        toRemove.add(upgraded);
+      }
+    }
+
     // 🔗 Kiểm tra cha–con
     for (const { parent, child } of ROLE_HIERARCHY) {
-      console.log(`🔍 [ROLE HIERARCHY] ${member.user.tag}: cóCha=${has(parent)} | cóCon=${has(child)}`);
-      if (!has(parent) && has(child)) {
+      const hasParent = has(parent);
+      const hasChild = has(child);
+      console.log(`🔍 [ROLE HIERARCHY] ${member.user.tag}: cóCha=${hasParent} | cóCon=${hasChild}`);
+
+      if (!hasParent && hasChild) {
         console.log(`🚨 [ROLE HIERARCHY] ${member.user.tag} mất ${parent}, xoá ${child}`);
         toRemove.add(child);
       }
@@ -134,20 +158,31 @@ async function updateMemberRoles(member) {
   }
 }
 
-// ====== Quét toàn bộ thành viên khi khởi động ======
+// ====== Quét toàn bộ khi khởi động ======
 async function initRoleUpdater(client) {
   console.log("🔄 Quét roles toàn bộ thành viên (khởi động)...");
-
   for (const [, guild] of client.guilds.cache) {
     await guild.members.fetch().catch(() => {});
     const members = guild.members.cache.filter(m => !m.user.bot);
     for (const member of members.values()) {
       await updateMemberRoles(member);
-      await new Promise(res => setTimeout(res, 150)); // tránh spam rate limit
+      await new Promise(res => setTimeout(res, 150)); // tránh rate-limit
     }
   }
-
   console.log("✅ Quét hoàn tất!");
+
+  // ♻️ Định kỳ 10 phút quét lại để đảm bảo đồng bộ
+  setInterval(async () => {
+    for (const [, guild] of client.guilds.cache) {
+      const members = await guild.members.fetch();
+      for (const member of members.values()) {
+        if (member.user.bot) continue;
+        await updateMemberRoles(member);
+        await new Promise(res => setTimeout(res, 200));
+      }
+    }
+    console.log("♻️ Đã quét toàn bộ roles để đảm bảo đồng bộ");
+  }, 1000 * 60 * 10);
 }
 
 // ====== Lắng nghe sự kiện role update ======
