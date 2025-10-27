@@ -15,22 +15,27 @@ module.exports = (client) => {
       const channel = msg.channel;
       if (!channel || !channel.parentId) return;
 
-      if (inactivityTimers.has(channel.id)) clearTimeout(inactivityTimers.get(channel.id));
+      // 🟢 Auto rename mỗi khi có webhook gửi tin (đảm bảo tên luôn đúng)
+      await renameChannelByCategory(channel);
+
+      // Nếu có timer cũ thì reset lại
+      if (inactivityTimers.has(channel.id))
+        clearTimeout(inactivityTimers.get(channel.id));
 
       // Nếu webhook hoạt động trong danh mục ngủ → chuyển về danh mục hoạt động
       if (channel.parentId === CATEGORY_2) {
         await channel.setParent(CATEGORY_1, { lockPermissions: false }).catch(() => {});
-        await new Promise(r => setTimeout(r, 500)); // Đợi Discord cập nhật parent
+        await new Promise((r) => setTimeout(r, 1000)); // đợi Discord cập nhật parent
         await renameChannelByCategory(channel);
         console.log(`🔄 Đưa ${channel.name} về danh mục hoạt động (do có webhook mới)`);
       }
 
-      // Đặt lại hẹn giờ 1 ngày
+      // Đặt lại hẹn giờ 1 ngày không hoạt động
       const timer = setTimeout(async () => {
         try {
           if (channel.parentId === CATEGORY_1) {
             await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, 1000));
             await renameChannelByCategory(channel);
             console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
           }
@@ -54,7 +59,7 @@ module.exports = (client) => {
         const timer = setTimeout(async () => {
           try {
             await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, 1000));
             await renameChannelByCategory(channel);
             console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
           } catch (err) {
