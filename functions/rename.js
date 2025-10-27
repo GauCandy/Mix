@@ -16,7 +16,7 @@ async function renameChannelByCategory(channel) {
     } else if (channel.parentId === CATEGORY_2) {
       newName = `⏰★】${username}-macro`;
     } else {
-      return; // Không thuộc 2 danh mục cần rename
+      return;
     }
 
     if (channel.name !== newName) {
