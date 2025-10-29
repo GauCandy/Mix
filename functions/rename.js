@@ -1,12 +1,12 @@
-// functions/rename.js
 async function renameChannelByCategory(channel) {
   try {
     const CATEGORY_1 = "1411034825699233943"; // Danh mục hoạt động
     const CATEGORY_2 = "1427958263281881088"; // Danh mục ngủ
 
-    if (!channel || !channel.topic) return;
+    if (!channel) return;
 
-    const [username] = channel.topic.split(" ");
+    const topic = channel.topic || "";
+    const [username] = topic.split(" ");
     if (!username) return;
 
     let newName;
@@ -20,7 +20,7 @@ async function renameChannelByCategory(channel) {
     }
 
     if (channel.name !== newName) {
-      await channel.setName(newName).catch(() => {});
+      await channel.setName(newName).catch(err => console.error("❌ Lỗi đổi tên:", err.message));
       console.log(`✅ Đổi tên: ${channel.name} → ${newName}`);
     }
   } catch (err) {
