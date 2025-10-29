@@ -3,7 +3,7 @@ const { renameChannelByCategory } = require("../functions/rename");
 
 const CATEGORY_1 = "1411034825699233943"; // danh mục hoạt động
 const CATEGORY_2 = "1427958263281881088"; // danh mục ngủ
-const AUTO_ROLE_ID1 = "1411240101832298569"; // role auto
+const MACRO_ROLE = "1411240101832298569"; // role auto
 const INACTIVITY_TIME = 1000 * 60 * 60 * 24; // 1 ngày không có webhook
 
 module.exports = (client) => {
@@ -18,13 +18,13 @@ module.exports = (client) => {
       if (!member) return;
 
       if (addRole) {
-        if (!member.roles.cache.has(AUTO_ROLE_ID1)) {
-          await member.roles.add(AUTO_ROLE_ID1).catch(() => {});
+        if (!member.roles.cache.has(MACRO_ROLE)) {
+          await member.roles.add(MACRO_ROLE).catch(() => {});
           console.log(`✅ Đã thêm role AUTO cho ${member.user.tag}`);
         }
       } else {
-        if (member.roles.cache.has(AUTO_ROLE_ID1)) {
-          await member.roles.remove(AUTO_ROLE_ID1).catch(() => {});
+        if (member.roles.cache.has(MACRO_ROLE)) {
+          await member.roles.remove(MACRO_ROLE).catch(() => {});
           console.log(`🧹 Đã xóa role AUTO khỏi ${member.user.tag}`);
         }
       }
