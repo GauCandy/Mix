@@ -1,15 +1,14 @@
 // events/channelHandler.js
-const { safeRename } = require("../functions/rename");
+const { renameChannelByCategory } = require("../functions/rename");
 
-const CATEGORY_1 = "1411034825699233943"; // Danh mục hoạt động
-const CATEGORY_2 = "1427958263281881088"; // Danh mục ngủ
-const MACRO_ROLE = "1411991634194989096"; // Role auto
-const INACTIVITY_TIME = 1000 * 60 * 60 * 24; // 1 ngày
+const CATEGORY_1 = "1411034825699233943"; // danh mục hoạt động
+const CATEGORY_2 = "1427958263281881088"; // danh mục ngủ
+const MACRO_ROLE = "1411991634194989096"; // role auto
+const INACTIVITY_TIME = 1000 * 60 * 60 * 24; // 1 ngày không có webhook
 
 module.exports = (client) => {
   const inactivityTimers = new Map();
 
-  // ===== Cập nhật role theo danh mục =====
   async function updateRoleByCategory(channel, addRole) {
     try {
       const topic = channel.topic || "";
@@ -21,16 +20,34 @@ module.exports = (client) => {
       if (addRole) {
         if (!member.roles.cache.has(MACRO_ROLE)) {
           await member.roles.add(MACRO_ROLE).catch(() => {});
-          console.log(`✅ Đã thêm role AUTO cho ${member.user.tag}`);
+          console.log(`✅ Added AUTO role to ${member.user.tag}`);
         }
       } else {
         if (member.roles.cache.has(MACRO_ROLE)) {
           await member.roles.remove(MACRO_ROLE).catch(() => {});
-          console.log(`🧹 Đã xóa role AUTO khỏi ${member.user.tag}`);
+          console.log(`🧹 Removed AUTO role from ${member.user.tag}`);
         }
       }
     } catch (err) {
-      console.error("❌ Lỗi khi cập nhật role:", err);
+      console.error("❌ Role update error:", err);
+    }
+  }
+
+  async function sendNotify(channel, type) {
+    try {
+      const userId = channel.topic?.match(/\d{17,20}/)?.[0];
+      if (!userId) return;
+      if (type === "sleep") {
+        await channel.send(
+          `<@${userId}>\nYour macro channel has been moved to the **DORMANT** category due to 1 day of inactivity.`
+        );
+      } else if (type === "active") {
+        await channel.send(
+          `<@${userId}>\nYour macro channel has been reactivated.`
+        );
+      }
+    } catch (err) {
+      console.error("❌ Error sending notify:", err);
     }
   }
 
@@ -38,21 +55,20 @@ module.exports = (client) => {
   client.on("messageCreate", async (msg) => {
     try {
       if (!msg.webhookId) return;
-      let channel = msg.channel;
+      const channel = msg.channel;
       if (!channel || !channel.parentId) return;
 
       if (inactivityTimers.has(channel.id))
         clearTimeout(inactivityTimers.get(channel.id));
 
-      // Nếu webhook hoạt động trong danh mục ngủ → chuyển về hoạt động
+      // Nếu webhook hoạt động trong danh mục ngủ → chuyển về danh mục hoạt động
       if (channel.parentId === CATEGORY_2) {
         await channel.setParent(CATEGORY_1, { lockPermissions: false }).catch(() => {});
-        await new Promise((r) => setTimeout(r, 1000));
-        channel = await channel.fetch(true).catch(() => channel);
-
-        await safeRename(channel);
+        await new Promise((r) => setTimeout(r, 500));
+        await renameChannelByCategory(channel);
         await updateRoleByCategory(channel, true);
-        console.log(`🔄 Webhook mới → ${channel.name} về danh mục hoạt động`);
+        await sendNotify(channel, "active");
+        console.log(`🔄 Reactivated: ${channel.name}`);
       }
 
       // Đặt lại hẹn giờ 1 ngày
@@ -60,28 +76,27 @@ module.exports = (client) => {
         try {
           if (channel.parentId === CATEGORY_1) {
             await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise((r) => setTimeout(r, 1000));
-            channel = await channel.fetch(true).catch(() => channel);
-
-            await safeRename(channel);
+            await new Promise((r) => setTimeout(r, 500));
+            await renameChannelByCategory(channel);
             await updateRoleByCategory(channel, false);
-            console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
+            await sendNotify(channel, "sleep");
+            console.log(`📦 Moved ${channel.name} → DORMANT (1 day inactive)`);
           }
         } catch (err) {
-          console.error("❌ Lỗi khi chuyển danh mục:", err);
+          console.error("❌ Error when moving to DORMANT:", err);
         }
       }, INACTIVITY_TIME);
 
       inactivityTimers.set(channel.id, timer);
     } catch (err) {
-      console.error("❌ Lỗi messageCreate:", err);
+      console.error("❌ messageCreate error:", err);
     }
   });
 
   // ===== Khi kênh được tạo =====
   client.on("channelCreate", async (channel) => {
     try {
-      await safeRename(channel);
+      await renameChannelByCategory(channel);
 
       if (channel.parentId === CATEGORY_1) {
         await updateRoleByCategory(channel, true);
@@ -93,21 +108,20 @@ module.exports = (client) => {
         const timer = setTimeout(async () => {
           try {
             await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
-            await new Promise((r) => setTimeout(r, 1000));
-            channel = await channel.fetch(true).catch(() => channel);
-
-            await safeRename(channel);
+            await new Promise((r) => setTimeout(r, 500));
+            await renameChannelByCategory(channel);
             await updateRoleByCategory(channel, false);
-            console.log(`📦 Chuyển ${channel.name} → danh mục ngủ (1 ngày không có webhook)`);
+            await sendNotify(channel, "sleep");
+            console.log(`📦 Moved ${channel.name} → DORMANT (1 day inactive)`);
           } catch (err) {
-            console.error("❌ Lỗi khi chuyển danh mục:", err);
+            console.error("❌ Error moving on create:", err);
           }
         }, INACTIVITY_TIME);
 
         inactivityTimers.set(channel.id, timer);
       }
     } catch (err) {
-      console.error("❌ Lỗi channelCreate:", err);
+      console.error("❌ channelCreate error:", err);
     }
   });
 
@@ -116,19 +130,18 @@ module.exports = (client) => {
     try {
       if (!newCh || newCh.type !== 0) return;
       if (oldCh.parentId !== newCh.parentId) {
-        await new Promise((r) => setTimeout(r, 1000));
-        newCh = await newCh.fetch(true).catch(() => newCh);
-
-        await safeRename(newCh);
+        await renameChannelByCategory(newCh);
         if (newCh.parentId === CATEGORY_1) {
           await updateRoleByCategory(newCh, true);
+          await sendNotify(newCh, "active");
         } else if (newCh.parentId === CATEGORY_2) {
           await updateRoleByCategory(newCh, false);
+          await sendNotify(newCh, "sleep");
         }
-        console.log(`🪄 ChannelUpdate: ${newCh.name} đổi danh mục`);
+        console.log(`🪄 ChannelUpdate: ${newCh.name} category changed`);
       }
     } catch (err) {
-      console.error("❌ Lỗi channelUpdate:", err);
+      console.error("❌ channelUpdate error:", err);
     }
   });
 
