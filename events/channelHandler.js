@@ -43,7 +43,7 @@ module.exports = (client) => {
         );
       } else if (type === "active") {
         await channel.send(
-          `<@${userId}>\nYour macro channel has been reactivated.`
+          `<@${userId}>\nYour macro channel has been has been moved to the **MACRO|OPEN|** catelogry due reactivated.`
         );
       }
     } catch (err) {
