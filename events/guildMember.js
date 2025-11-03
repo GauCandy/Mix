@@ -1,15 +1,17 @@
+const { queueMember } = require("../functions/roleQueueManager");
 const { updateMemberRoles } = require("../functions/updateRoles");
-const queue = new Map(); // Queue xử lý từng user
+const queue = new Map(); // Gom request theo user để tránh spam API
 
 module.exports = client => {
+  // Khi thành viên mới vào server
   client.on("guildMemberAdd", member => {
     console.log(`✅ [JOIN] ${member.user.tag} đã vào server`);
-    updateMemberRoles(member);
+    queueMember(member); // dùng queueMember thay vì updateMemberRoles trực tiếp
   });
 
+  // Khi roles của thành viên thay đổi
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
-      // 🧭 Luôn fetch lại roles mới nhất
       await newMember.fetch(true).catch(() => {});
 
       const oldRoles = [...oldMember.roles.cache.keys()];
@@ -23,16 +25,16 @@ module.exports = client => {
       if (lostRoles.length) console.log(`🧹 Mất roles: ${lostRoles.join(", ")}`);
       if (gainedRoles.length) console.log(`✨ Nhận roles: ${gainedRoles.join(", ")}`);
 
-      // 🧠 Gom request theo user để tránh nghẽn
       const userId = newMember.id;
-      if (!queue.has(userId)) queue.set(userId, Promise.resolve());
 
+      if (!queue.has(userId)) queue.set(userId, Promise.resolve());
       const last = queue.get(userId);
+
+      // 🧠 Đảm bảo mỗi user xử lý tuần tự, cách nhau 300ms
       const next = (async () => {
-        // Chờ 300ms giữa mỗi lần để tránh API spam
         await last.catch(() => {});
         await new Promise(r => setTimeout(r, 300));
-        await updateMemberRoles(newMember);
+        queueMember(newMember); // gọi queueManager (sẽ tự xử lý update)
       })();
 
       queue.set(userId, next);
@@ -41,3 +43,4 @@ module.exports = client => {
     }
   });
 };
+
