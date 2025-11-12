@@ -6,16 +6,38 @@ async function renameChannelByCategory(channel) {
 
     if (!channel || !channel.topic) return;
 
+    // 1. Phân tích tên người dùng (username) từ topic
     const [username] = channel.topic.split(" ");
     if (!username) return;
 
-    let newName;
+    // 2. Tìm phần mở rộng của tên kênh hiện tại
+    // Tên kênh cũ có dạng: [Ký hiệu cũ] [username]-macro[Phần mở rộng]
+    const baseName = `${username}-macro`;
+    
+    // Tìm vị trí bắt đầu của baseName trong tên kênh hiện tại
+    const baseIndex = channel.name.indexOf(baseName);
+    
+    let extension = "";
+    if (baseIndex !== -1) {
+      // Lấy phần mở rộng, bao gồm khoảng trắng nếu có
+      extension = channel.name.substring(baseIndex + baseName.length).trim();
+      // Thêm lại khoảng trắng nếu extension không rỗng để phân tách
+      if (extension) {
+        extension = ` ${extension}`;
+      }
+    }
+    
+    let newPrefix;
     if (channel.parentId === CATEGORY_1) {
-      newName = `🛠★】${username}-macro`;
+      newPrefix = "🛠★】";
     } else if (channel.parentId === CATEGORY_2) {
-      newName = `⏰★】${username}-macro`;
-    } else return;
+      newPrefix = "⏰★】";
+    } else return; // Không nằm trong category cần xử lý
 
+    // 3. Tạo tên mới: [Ký hiệu mới] + [username]-macro + [Phần mở rộng]
+    const newName = `${newPrefix}${baseName}${extension}`;
+
+    // 4. Thực hiện đổi tên nếu cần
     if (channel.name !== newName) {
       await channel.setName(newName).catch(() => {});
       console.log(`✅ Đổi tên: ${channel.name} → ${newName}`);
