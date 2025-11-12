@@ -6,38 +6,40 @@ async function renameChannelByCategory(channel) {
 
     if (!channel || !channel.topic) return;
 
-    // 1. Phân tích tên người dùng (username) từ topic
+    // 1. Lấy username từ topic
     const [username] = channel.topic.split(" ");
     if (!username) return;
 
-    // 2. Tìm phần mở rộng của tên kênh hiện tại
-    // Tên kênh cũ có dạng: [Ký hiệu cũ] [username]-macro[Phần mở rộng]
+    // 2. Xây dựng tên cơ sở (baseName)
     const baseName = `${username}-macro`;
-    
-    // Tìm vị trí bắt đầu của baseName trong tên kênh hiện tại
-    const baseIndex = channel.name.indexOf(baseName);
-    
+    const currentName = channel.name;
+
+    // 3. Tìm phần mở rộng (extension)
+    // Tìm vị trí của baseName trong tên kênh hiện tại
+    const baseIndex = currentName.indexOf(baseName);
+
     let extension = "";
     if (baseIndex !== -1) {
-      // Lấy phần mở rộng, bao gồm khoảng trắng nếu có
-      extension = channel.name.substring(baseIndex + baseName.length).trim();
-      // Thêm lại khoảng trắng nếu extension không rỗng để phân tách
-      if (extension) {
-        extension = ` ${extension}`;
-      }
+      // Nếu tìm thấy, lấy mọi thứ nằm SAU baseName
+      extension = currentName.substring(baseIndex + baseName.length);
     }
-    
+    // Nếu không tìm thấy (baseIndex === -1), extension sẽ là ""
+    // Điều này cũng xử lý trường hợp tên kênh bị sai và cần "sửa" lại
+
+    // 4. Xác định ký hiệu mới (newPrefix)
     let newPrefix;
     if (channel.parentId === CATEGORY_1) {
       newPrefix = "🛠★】";
     } else if (channel.parentId === CATEGORY_2) {
       newPrefix = "⏰★】";
-    } else return; // Không nằm trong category cần xử lý
+    } else {
+      return; // Không phải category cần đổi tên
+    }
 
-    // 3. Tạo tên mới: [Ký hiệu mới] + [username]-macro + [Phần mở rộng]
+    // 5. Tạo tên mới = [Ký hiệu mới] + [Tên cơ sở] + [Phần mở rộng]
     const newName = `${newPrefix}${baseName}${extension}`;
 
-    // 4. Thực hiện đổi tên nếu cần
+    // 6. Đổi tên nếu cần
     if (channel.name !== newName) {
       await channel.setName(newName).catch(() => {});
       console.log(`✅ Đổi tên: ${channel.name} → ${newName}`);
