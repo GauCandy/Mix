@@ -9,12 +9,29 @@ async function renameChannelByCategory(channel) {
     const [username] = channel.topic.split(" ");
     if (!username) return;
 
-    let newName;
+    let newPrefix;
     if (channel.parentId === CATEGORY_1) {
-      newName = `🛠★】${username}-macro`;
+      newPrefix = "🛠★】";
     } else if (channel.parentId === CATEGORY_2) {
-      newName = `⏰★】${username}-macro`;
+      newPrefix = "⏰★】";
     } else return;
+
+    // Tên lý tưởng theo username
+    const expectedBase = `${username}-macro`;
+
+    // Lấy phần sau prefix (bỏ phần đầu như 🛠★】 hay ⏰★】)
+    const baseName = channel.name.replace(/^([^\w]*)★】/, "");
+
+    let newName;
+
+    // Nếu tên hiện tại KHÔNG chứa đúng username (kênh mới tạo)
+    if (!baseName.startsWith(expectedBase)) {
+      newName = `${newPrefix}${expectedBase}`; // tạo mới theo username
+    } else {
+      // chỉ đổi prefix, giữ nguyên phần còn lại (vd: "x1🌸")
+      const rest = baseName.slice(expectedBase.length).trim(); 
+      newName = `${newPrefix}${expectedBase}${rest ? " " + rest : ""}`;
+    }
 
     if (channel.name !== newName) {
       await channel.setName(newName).catch(() => {});
