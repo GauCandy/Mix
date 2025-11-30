@@ -20,12 +20,12 @@ module.exports = (client) => {
 
       if (addRole) {
         if (!member.roles.cache.has(MACRO_ROLE)) {
-          await member.roles.add(MACRO_ROLE).catch(() => {});
+          await member.roles.add(MACRO_ROLE).catch(err => console.error("❌ addRole err:", err));
           console.log(`✅ Added AUTO role to ${member.user.tag}`);
         }
       } else {
         if (member.roles.cache.has(MACRO_ROLE)) {
-          await member.roles.remove(MACRO_ROLE).catch(() => {});
+          await member.roles.remove(MACRO_ROLE).catch(err => console.error("❌ removeRole err:", err));
           console.log(`🧹 Removed AUTO role from ${member.user.tag}`);
         }
       }
@@ -41,11 +41,11 @@ module.exports = (client) => {
       if (type === "sleep") {
         await channel.send(
           `<@${userId}>\nYour macro channel has been moved to the **DORMANT** category due to 24 hours of no embeds.`
-        ).catch(()=>{});
+        ).catch(err => console.error("❌ notify sleep err:", err));
       } else if (type === "active") {
         await channel.send(
           `<@${userId}>\nYour macro channel has been moved to the **MACRO|OPEN|** category because it received a new embed.`
-        ).catch(()=>{});
+        ).catch(err => console.error("❌ notify active err:", err));
       }
     } catch (err) {
       console.error("❌ Error sending notify:", err);
@@ -64,9 +64,10 @@ module.exports = (client) => {
       clearTimer(channel.id);
       const timer = setTimeout(async () => {
         try {
-          // chỉ di chuyển nếu channel vẫn ở danh mục hoạt động
           if (channel.parentId === CATEGORY_1) {
-            await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
+            await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(err => {
+              console.error("❌ setParent error (to DORMANT):", err, "channelId:", channel.id);
+            });
             await new Promise((r) => setTimeout(r, 500));
             await renameChannelByCategory(channel);
             await updateRoleByCategory(channel, false);
@@ -88,7 +89,9 @@ module.exports = (client) => {
     try {
       clearTimer(channel.id);
       if (channel.parentId === CATEGORY_2) {
-        await channel.setParent(CATEGORY_1, { lockPermissions: false }).catch(() => {});
+        await channel.setParent(CATEGORY_1, { lockPermissions: false }).catch(err => {
+          console.error("❌ setParent error (to ACTIVITY):", err, "channelId:", channel.id);
+        });
         await new Promise((r) => setTimeout(r, 500));
         await renameChannelByCategory(channel);
         await updateRoleByCategory(channel, true);
@@ -107,7 +110,9 @@ module.exports = (client) => {
     try {
       clearTimer(channel.id);
       if (channel.parentId === CATEGORY_1) {
-        await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(() => {});
+        await channel.setParent(CATEGORY_2, { lockPermissions: false }).catch(err => {
+          console.error("❌ setParent error (startup to DORMANT):", err, "channelId:", channel.id);
+        });
         await new Promise((r) => setTimeout(r, 500));
         await renameChannelByCategory(channel);
         await updateRoleByCategory(channel, false);
@@ -123,8 +128,10 @@ module.exports = (client) => {
   async function getMostRecentEmbedTimestamp(channel) {
     try {
       if (!channel || channel.type !== 0) return { found: false, ts: null };
-      // fetch latest messages (limit 200) và tìm message đầu tiên có embeds
-      const fetched = await channel.messages.fetch({ limit: 200 }).catch(() => null);
+      const fetched = await channel.messages.fetch({ limit: 200 }).catch(err => {
+        console.error("❌ fetch messages err:", err, "channelId:", channel.id);
+        return null;
+      });
       if (!fetched) return { found: false, ts: null };
       const messages = Array.from(fetched.values());
       for (const m of messages) {
@@ -143,27 +150,20 @@ module.exports = (client) => {
   client.once("ready", async () => {
     try {
       console.log("🔎 Startup: scanning CATEGORY_1 once for embed activity...");
-      // Duyệt qua tất cả guild mà bot đang trong đó
       for (const [, guild] of client.guilds.cache) {
-        // Lấy category bằng id
-        const category = guild.channels.cache.get(CATEGORY_1);
-        if (!category) continue;
-        // Duyệt từng channel con trong category
-        for (const [, ch] of category.children) {
+        // Lấy tất cả text channel trong guild đang có parentId CATEGORY_1
+        const channels = guild.channels.cache.filter(ch => ch.parentId === CATEGORY_1 && ch.type === 0);
+        for (const [, ch] of channels) {
           try {
-            if (ch.type !== 0) continue;
             const { found, ts } = await getMostRecentEmbedTimestamp(ch);
             if (found) {
               const age = Date.now() - ts;
               if (age >= INACTIVITY_TIME) {
-                // embed gần nhất cách đây >= 24h -> move ngay
                 await moveToDormantImmediately(ch);
               } else {
-                // embed còn mới -> không set timer ngay (chờ event "embed mất" để bắt giờ)
-                console.log(`✅ ${ch.name} has recent embed (${Math.floor(age/1000)}s ago)`);
+                console.log(`✅ ${ch.name} has recent embed (${Math.floor(age / 1000)}s ago)`);
               }
             } else {
-              // Hiện đang không có embed nào -> bắt timer từ bây giờ
               console.log(`⚠️ ${ch.name} has NO embeds right now -> starting inactivity timer`);
               startInactivityTimer(ch);
             }
@@ -177,21 +177,19 @@ module.exports = (client) => {
     }
   });
 
-  // ===== Khi webhook gửi tin nhắn =====
+  // ===== Khi message được tạo (bất kỳ message có embed đều coi là activity) =====
   client.on("messageCreate", async (msg) => {
     try {
-      if (!msg.webhookId) return;
       const channel = msg.channel;
-      if (!channel || !channel.parentId) return;
+      if (!channel || channel.type !== 0) return;
 
-      // Nếu webhook gửi 1 message CHỨA EMBED → coi là hoạt động
+      // Nếu message có embed => coi là hoạt động
       if (msg.embeds && msg.embeds.length > 0) {
+        console.log(`[messageCreate] embed detected in ${channel.guild?.name || "guild"} / ${channel.name} (authorBot=${!!msg.author?.bot}, webhook=${!!msg.webhookId})`);
         await moveToActive(channel);
-        // nếu có embed, không cần set timer — sẽ chờ khi embed bị xóa/removed
         clearTimer(channel.id);
       } else {
-        // webhook nhưng không có embed => không reset timer theo yêu cầu
-        console.log(`ℹ️ Webhook message with no embeds in ${channel.name} -> no action`);
+        // Nếu không có embed thì không làm gì
       }
     } catch (err) {
       console.error("❌ messageCreate error:", err);
@@ -204,13 +202,11 @@ module.exports = (client) => {
       await renameChannelByCategory(channel);
 
       if (channel.parentId === CATEGORY_1) {
-        // Khi tạo trong category hoạt động, kiểm tra xem channel hiện có embed hay không
         const { found } = await getMostRecentEmbedTimestamp(channel);
         if (found) {
           await updateRoleByCategory(channel, true);
         } else {
           await updateRoleByCategory(channel, false);
-          // bắt timer từ khi tạo (nó không có embed)
           startInactivityTimer(channel);
         }
       } else if (channel.parentId === CATEGORY_2) {
@@ -249,16 +245,18 @@ module.exports = (client) => {
   // ===== Khi message bị xóa =====
   client.on("messageDelete", async (message) => {
     try {
-      const channel = message.channel;
+      let msg = message;
+      if (message.partial) {
+        try { msg = await message.fetch(); } catch (e) { /* ignore fetch fail */ }
+      }
+      const channel = msg.channel;
       if (!channel || channel.type !== 0) return;
 
-      // Nếu message vừa bị xóa có embeds, ta cần kiểm tra kênh còn embeds không
-      if (message.embeds && message.embeds.length > 0) {
+      if (msg.embeds && msg.embeds.length > 0) {
         const { found } = await getMostRecentEmbedTimestamp(channel);
         if (!found && channel.parentId === CATEGORY_1) {
-          // bắt giờ từ lúc kênh không còn embed
           startInactivityTimer(channel);
-          console.log(`🕵️‍♂️ No embeds after delete in ${channel.name} -> timer started`);
+          console.log(`🕵️ No embeds after delete in ${channel.name} -> timer started`);
         }
       }
     } catch (err) {
@@ -269,21 +267,23 @@ module.exports = (client) => {
   // ===== Khi message được chỉnh sửa =====
   client.on("messageUpdate", async (oldMessage, newMessage) => {
     try {
-      // newMessage có thể partial; đảm bảo là full message để kiểm tra embeds
-      const channel = newMessage.channel;
+      let nm = newMessage;
+      if (newMessage.partial) {
+        try { nm = await newMessage.fetch(); } catch (e) { /* ignore */ }
+      }
+      const channel = nm.channel;
       if (!channel || channel.type !== 0) return;
 
-      // Nếu newMessage hiện không có embeds (trước đó có thể có), kiểm tra toàn channel
-      if ((!newMessage.embeds || newMessage.embeds.length === 0)) {
+      const hasEmbeds = nm.embeds && nm.embeds.length > 0;
+      if (!hasEmbeds) {
         const { found } = await getMostRecentEmbedTimestamp(channel);
         if (!found && channel.parentId === CATEGORY_1) {
           startInactivityTimer(channel);
-          console.log(`🕵️‍♂️ No embeds after update in ${channel.name} -> timer started`);
+          console.log(`🕵️ No embeds after update in ${channel.name} -> timer started`);
         }
-      } else if (newMessage.embeds && newMessage.embeds.length > 0) {
-        // Nếu message update có embed (thêm embed) => cancel timer / reactivate
+      } else {
         await moveToActive(channel);
-        console.log(`✅ embed added by update in ${channel.name} -> reactivated`);
+        console.log(`✅ embed present after update in ${channel.name} -> reactivated`);
       }
     } catch (err) {
       console.error("❌ messageUpdate error:", err);
