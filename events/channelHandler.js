@@ -11,7 +11,7 @@ const REPORT_CHANNEL_ID = "1438039815919632394"; // kênh gửi report
 const STREAK_FILE = path.join(__dirname, "../data/streaks.json");
 
 module.exports = (client) => {
-  const channelData = new Map(); // {channelId: {streak, firstWebhook, lastWebhook, daysWithoutActivity}}
+  const channelData = new Map(); // {channelId: {streak, firstWebhook, lastWebhook, daysWithoutActivity, lastCheckDate}}
 
   // ===== Load data từ JSON =====
   function loadData() {
@@ -72,9 +72,16 @@ module.exports = (client) => {
         firstWebhook: null,
         lastWebhook: null,
         daysWithoutActivity: 0,
+        lastCheckDate: null,
       });
     }
     return channelData.get(channelId);
+  }
+
+  // ===== Helper: Lấy ngày hiện tại (format YYYY-MM-DD) =====
+  function getCurrentDate() {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
   }
 
   // ===== Helper: Tính thời gian 13:00 UTC+7 tiếp theo =====
@@ -192,6 +199,7 @@ module.exports = (client) => {
         // Reset webhook tracking cho ngày mới
         data.firstWebhook = null;
         data.lastWebhook = null;
+        data.lastCheckDate = getCurrentDate();
       }
 
       saveData();
@@ -341,13 +349,24 @@ module.exports = (client) => {
           (ch.parentId === CATEGORY_1 || ch.parentId === CATEGORY_2)
       );
 
+      const today = getCurrentDate();
       for (const [, channel] of channels) {
         const streakFromName = parseStreakFromName(channel.name);
         const data = getData(channel.id, channel);
 
+        // Sync streak từ tên kênh
         if (streakFromName !== data.streak && streakFromName > 0) {
           data.streak = streakFromName;
           console.log(`🔄 Synced streak for ${channel.name}: ${streakFromName}`);
+        }
+
+        // Reset webhook tracking nếu qua ngày mới
+        if (data.lastCheckDate !== today) {
+          if (data.firstWebhook || data.lastWebhook) {
+            console.log(`🔄 Reset webhook tracking for ${channel.name} (new day)`);
+          }
+          data.firstWebhook = null;
+          data.lastWebhook = null;
         }
       }
 
@@ -364,9 +383,15 @@ module.exports = (client) => {
   // ===== Khi webhook gửi tin nhắn =====
   client.on("messageCreate", async (msg) => {
     try {
+      // Chỉ xử lý message từ webhook
       if (!msg.webhookId) return;
       const channel = msg.channel;
       if (!channel || !channel.parentId) return;
+
+      // Kiểm tra ID người dùng trong topic có khớp với author không
+      const topic = channel.topic || "";
+      const userId = topic.match(/\d{17,20}/)?.[0];
+      if (!userId || msg.author.id !== userId) return;
 
       const now = Date.now();
       const data = getData(channel.id, channel);
